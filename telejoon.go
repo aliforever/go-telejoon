@@ -75,6 +75,7 @@ func splitCallbackData(data, separator string) (command string, args []string) {
 }
 
 func (t *Telejoon[T]) processPrivateMessage(update tgbotapi.Update) {
+	// check if default state is set
 	if t.handlers.stateHandlers.defaultState == "" {
 		t.onErr(update, fmt.Errorf("empty_user_state"))
 		return
