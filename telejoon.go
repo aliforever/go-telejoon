@@ -75,10 +75,18 @@ func splitCallbackData(data, separator string) (command string, args []string) {
 }
 
 func (t *Telejoon[T]) processPrivateMessage(update tgbotapi.Update) {
+	if t.handlers.stateHandlers.defaultState == "" {
+		t.onErr(update, fmt.Errorf("empty_user_state"))
+		return
+	}
+
 	userState, err := t.handlers.stateHandlers.userStateRepository.Find(update.Message.From.Id)
 	if err != nil {
-		t.onErr(update, err)
-		return
+		err = t.handlers.stateHandlers.userStateRepository.Store(update.Message.From.Id, t.handlers.stateHandlers.defaultState)
+		if err != nil {
+			t.onErr(update, fmt.Errorf("store_user_state: %w", err))
+			return
+		}
 	}
 
 	if userState == "" {
