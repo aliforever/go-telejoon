@@ -82,18 +82,9 @@ func (t *Telejoon[T]) processPrivateMessage(update tgbotapi.Update) {
 	}
 
 	userState, err := t.handlers.stateHandlers.userStateRepository.Find(update.Message.From.Id)
-	if err != nil {
+	if err != nil || userState == "" {
 		userState = t.handlers.stateHandlers.defaultState
 		err = t.handlers.stateHandlers.userStateRepository.Store(update.Message.From.Id, userState)
-		if err != nil {
-			t.onErr(update, fmt.Errorf("store_user_state: %w", err))
-			return
-		}
-	}
-
-	if userState == "" {
-		err = t.handlers.stateHandlers.userStateRepository.Store(
-			update.Message.From.Id, t.handlers.stateHandlers.defaultState)
 		if err != nil {
 			t.onErr(update, fmt.Errorf("store_user_state: %w", err))
 			return
@@ -116,9 +107,9 @@ func (t *Telejoon[T]) processPrivateMessage(update tgbotapi.Update) {
 	}
 
 	if nextState := handler(user, update, false); nextState != "" {
-		err = t.handlers.stateHandlers.userStateRepository.Store(update.Message.From.Id, nextState)
+		err = t.handlers.stateHandlers.userStateRepository.Update(update.Message.From.Id, nextState)
 		if err != nil {
-			t.onErr(update, fmt.Errorf("store_user_state: %s", err))
+			t.onErr(update, fmt.Errorf("update_user_state: %s", err))
 			return
 		}
 
