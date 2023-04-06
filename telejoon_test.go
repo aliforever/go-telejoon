@@ -14,19 +14,31 @@ type User struct {
 	Id int64
 }
 
+func (u User) LanguageCode() string {
+	return "fa"
+}
+
 // UserRepository is a dummy implementation of UserRepository interface.
 type UserRepository struct{}
 
-func (u *UserRepository) Store(user *structs.User) (*User, error) {
-	return &User{Id: user.Id}, nil
+func (u *UserRepository) Store(user *structs.User) (User, error) {
+	return User{Id: user.Id}, nil
 }
 
-func (u *UserRepository) Find(id int64) (*User, error) {
-	return &User{Id: id}, nil
+func (u *UserRepository) Find(id int64) (User, error) {
+	return User{Id: id}, nil
+}
+
+func (u *UserRepository) SetLanguage(id int64, language string) error {
+	return nil
 }
 
 // UserStateRepository is a dummy implementation of UserStateRepository interface.
 type UserStateRepository struct{}
+
+func (u *UserStateRepository) Update(userID int64, state string) error {
+	return nil
+}
 
 func (u *UserStateRepository) Store(id int64, state string) error {
 	return nil
@@ -36,28 +48,63 @@ func (u *UserStateRepository) Find(id int64) (string, error) {
 	return "Welcome", nil
 }
 
+type language interface {
+	telejoon.LanguageI
+	Welcome() string
+}
+
+type Farsi struct {
+}
+
+func (f Farsi) Flag() string {
+	return "🇮🇷"
+}
+
+func (f Farsi) Code() string {
+	return "fa"
+}
+
+func (f Farsi) Name() string {
+	return "Farsi"
+}
+
+func (f Farsi) SelectLanguage() string {
+	return "انتخاب زبان"
+}
+
+func (f Farsi) Welcome() string {
+	return "خوش آمدید"
+}
+
 func TestNew(t *testing.T) {
 	botToken := os.Getenv("BOT_TOKEN")
 	if botToken == "" {
 		t.Skip("BOT_TOKEN is not set")
 	}
 
-	c, _ := tgbotapi.NewTelegramBot(botToken)
+	c, _ := tgbotapi.New(botToken)
 
-	ch := telejoon.NewCallbackHandlers[User](":").
-		AddHandler("info", func(user *User, update tgbotapi.Update, args ...string) {
-			c.Send(c.Message().SetChatId(user.Id).SetText("info:" + strings.Join(args, " ")))
+	go func() {
+		err := c.GetUpdates().LongPoll()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	ch := telejoon.NewCallbackHandlers[User, language](":").
+		AddHandler("info", func(update telejoon.CallbackUpdate[User, language], args ...string) {
+			c.Send(c.Message().SetChatId(update.User.Id).SetText("info:" + strings.Join(args, " ")))
 		})
 
-	sh := telejoon.NewStateHandlers[User]("Welcome", &UserRepository{}, &UserStateRepository{}).
-		AddHandler("Welcome", func(user *User, update tgbotapi.Update, isSwitched bool) string {
-			if !isSwitched {
-				if update.Message.Text == "/info" {
+	sh := telejoon.NewStateHandlers[User, language]("Welcome", &UserRepository{}, &UserStateRepository{}).
+		AddHandler("Welcome", func(update telejoon.StateUpdate[User, language]) string {
+			if !update.IsSwitched {
+				if update.Update.Message.Text == "/info" {
 					return "Info"
 				}
-				if update.Message.Text == "/callback" {
+				if update.Update.Message.Text == "/callback" {
 					c.Send(c.Message().
-						SetChatId(user.Id).
+						SetChatId(update.User.Id).
 						SetText("Choose an option...").
 						SetReplyMarkup(c.Tools.Keyboards.NewInlineKeyboardFromSlicesOfMaps([][]map[string]string{
 							{{"text": "info:1", "callback_data": "info:1"}},
@@ -68,21 +115,24 @@ func TestNew(t *testing.T) {
 			}
 
 			c.Send(c.Message().
-				SetChatId(user.Id).
+				SetChatId(update.User.Id).
 				SetText("Choose an option...").
 				SetReplyMarkup(c.Tools.Keyboards.NewReplyKeyboardFromSlicesOfStrings([][]string{{"/info"}})))
 
 			return ""
 		}).
-		AddHandler("Info", func(user *User, update tgbotapi.Update, isSwitched bool) string {
-			c.Send(c.Message().SetChatId(user.Id).SetText("Info Menu!"))
+		AddHandler("Info", func(update telejoon.StateUpdate[User, language]) string {
+			c.Send(c.Message().SetChatId(update.User.Id).SetText("Info Menu!"))
 
 			return ""
 		})
 
-	d := telejoon.New[User](
-		c.GetUpdates().LongPoll(),
-		telejoon.NewHandlers[User]().SetStateHandlers(sh).SetCallbackHandlers(ch),
+	d := telejoon.New[User, language](
+		c,
+		telejoon.NewHandlers[User, language]().
+			SetStateHandlers(sh).
+			SetCallbackHandlers(ch),
+		[]language{Farsi{}},
 		telejoon.NewOptions().OnErr(onErr),
 	)
 

@@ -1,34 +1,33 @@
 package telejoon
 
 import (
-	tgbotapi "github.com/aliforever/go-telegram-bot-api"
 	"sync"
 )
 
-type StateHandlers[T any] struct {
+type StateHandlers[User UserI, Lang LanguageI] struct {
 	m sync.Mutex
 
 	defaultState string
 
-	userRepository      UserRepository[T]
+	userRepository      UserRepository[User]
 	userStateRepository UserStateRepository
 
-	handlers map[string]func(user *T, update tgbotapi.Update, isSwitched bool) string
+	handlers map[string]func(update StateUpdate[User, Lang]) string
 }
 
-func NewStateHandlers[T any](
-	defaultState string, userRepo UserRepository[T], userStateRepo UserStateRepository) *StateHandlers[T] {
+func NewStateHandlers[User UserI, Lang LanguageI](
+	defaultState string, userRepo UserRepository[User], userStateRepo UserStateRepository) *StateHandlers[User, Lang] {
 
-	return &StateHandlers[T]{
+	return &StateHandlers[User, Lang]{
 		defaultState:        defaultState,
 		userRepository:      userRepo,
 		userStateRepository: userStateRepo,
-		handlers:            make(map[string]func(user *T, update tgbotapi.Update, isSwitched bool) string),
+		handlers:            make(map[string]func(update StateUpdate[User, Lang]) string),
 	}
 }
 
-func (s *StateHandlers[T]) AddHandler(
-	state string, handler func(user *T, update tgbotapi.Update, isSwitched bool) string) *StateHandlers[T] {
+func (s *StateHandlers[User, Lang]) AddHandler(
+	state string, handler func(update StateUpdate[User, Lang]) string) *StateHandlers[User, Lang] {
 
 	s.m.Lock()
 	defer s.m.Unlock()
@@ -38,7 +37,7 @@ func (s *StateHandlers[T]) AddHandler(
 	return s
 }
 
-func (s *StateHandlers[T]) GetHandler(state string) func(*T, tgbotapi.Update, bool) string {
+func (s *StateHandlers[User, Lang]) GetHandler(state string) func(update StateUpdate[User, Lang]) string {
 	s.m.Lock()
 	defer s.m.Unlock()
 

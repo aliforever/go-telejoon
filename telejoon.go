@@ -3,27 +3,40 @@ package telejoon
 import (
 	"fmt"
 	tgbotapi "github.com/aliforever/go-telegram-bot-api"
+	"github.com/aliforever/go-telegram-bot-api/structs"
 	"strings"
 )
 
-type Telejoon[T any] struct {
+type Telejoon[User UserI, Language LanguageI] struct {
 	opts []*Options
 
-	updates chan tgbotapi.Update
+	client *tgbotapi.TelegramBot
 
-	handlers *Handlers[T]
+	handlers *Handlers[User, Language]
+
+	languages map[string]Language
 }
 
-func New[T any](updates chan tgbotapi.Update, handlers *Handlers[T], opts ...*Options) *Telejoon[T] {
-	return &Telejoon[T]{
+func New[User UserI, Language LanguageI](
+	client *tgbotapi.TelegramBot, handlers *Handlers[User, Language], languages []Language,
+	opts ...*Options) *Telejoon[User, Language] {
+
+	return &Telejoon[User, Language]{
 		opts:     opts,
-		updates:  updates,
+		client:   client,
 		handlers: handlers,
+		languages: func() map[string]Language {
+			langs := make(map[string]Language)
+			for _, lang := range languages {
+				langs[lang.Code()] = lang
+			}
+			return langs
+		}(),
 	}
 }
 
-func (t *Telejoon[T]) Start() {
-	for update := range t.updates {
+func (t *Telejoon[User, Language]) Start() {
+	for update := range t.client.Updates() {
 		if t.handlers != nil {
 			if t.handlers.stateHandlers != nil && update.Message != nil && update.Message.IsPrivate() {
 				go t.processPrivateMessage(update)
@@ -38,13 +51,112 @@ func (t *Telejoon[T]) Start() {
 	}
 }
 
-func (t *Telejoon[T]) onErr(update tgbotapi.Update, err error) {
+func (t *Telejoon[User, Language]) DefaultWelcomeState(update StateUpdate[User, Language]) string {
+	if update.User.LanguageCode() == "" {
+		return "DefaultChangeLanguageState"
+	}
+
+	userLanguage, err := t.getUserLanguage(update)
+	if err != nil {
+		t.onErr(update.Update, err)
+		return ""
+	}
+
+	if !update.IsSwitched {
+		if update.Update.Message.Text == userLanguage.SelectLanguage() {
+			return "DefaultChangeLanguageState"
+		}
+	}
+
+	keyboard := t.client.Tools.Keyboards.NewReplyKeyboardFromSlicesOfStrings([][]string{
+		{userLanguage.SelectLanguage()},
+	})
+
+	t.client.Send(t.client.Message().SetChatId(update.Update.From().Id).
+		SetText(userLanguage.Welcome()).
+		SetReplyMarkup(keyboard))
+
+	return ""
+}
+
+func (t *Telejoon[User, Language]) DefaultChangeLanguageState(update StateUpdate[User, Language]) string {
+	var keyboard *structs.ReplyKeyboardMarkup
+
+	{
+		rows := [][]string{}
+		row := []string{}
+
+		for _, language := range t.languages {
+			row = append(row, fmt.Sprintf("%s %s", language.Flag(), language.Name()))
+			if len(row) == 2 {
+				rows = append(rows, row)
+				row = []string{}
+			}
+		}
+
+		if len(row) > 0 {
+			rows = append(rows, row)
+		}
+
+		keyboard = t.client.Tools.Keyboards.NewReplyKeyboardFromSlicesOfStrings(rows)
+	}
+
+	if !update.IsSwitched {
+		for _, language := range t.languages {
+			if update.Update.Message.Text == fmt.Sprintf("%s %s", language.Flag(), language.Name()) {
+				err := t.handlers.stateHandlers.userRepository.SetLanguage(update.Update.From().Id, language.Code())
+				if err != nil {
+					t.onErr(update.Update, err)
+					return ""
+				}
+
+				return "DefaultWelcomeState"
+			}
+		}
+	}
+
+	var text string
+
+	{
+		texts := []string{}
+
+		for _, language := range t.languages {
+			texts = append(texts, fmt.Sprintf("%s %s", language.Flag(), language.SelectLanguage()))
+		}
+
+		text = strings.Join(texts, "\n")
+	}
+
+	_, err := t.client.Send(t.client.Message().
+		SetChatId(update.Update.From().Id).
+		SetText(text).
+		SetReplyMarkup(keyboard))
+	if err != nil {
+		t.onErr(update.Update, err)
+	}
+
+	return ""
+}
+
+func (t *Telejoon[User, Language]) getUserLanguage(update StateUpdate[User, Language]) (Language, error) {
+	if len(t.languages) == 0 {
+		return nil, fmt.Errorf("empty_languages")
+	}
+
+	if lang, ok := t.languages[update.User.LanguageCode()]; ok {
+		return lang, nil
+	}
+
+	return nil, fmt.Errorf("language_not_found: %s", update.User.LanguageCode())
+}
+
+func (t *Telejoon[User, Language]) onErr(update tgbotapi.Update, err error) {
 	if len(t.opts) > 0 && t.opts[0].onErr != nil {
 		t.opts[0].onErr(update, err)
 	}
 }
 
-func (t *Telejoon[T]) processCallback(update tgbotapi.Update) {
+func (t *Telejoon[User, Language]) processCallback(update tgbotapi.Update) {
 	command, args := splitCallbackData(update.CallbackQuery.Data, t.handlers.callbackHandlers.commandSeparator)
 
 	handler := t.handlers.callbackHandlers.GetHandler(command)
@@ -62,7 +174,22 @@ func (t *Telejoon[T]) processCallback(update tgbotapi.Update) {
 		}
 	}
 
-	handler(user, update, args...)
+	if user.LanguageCode() == "" {
+		t.onErr(update, fmt.Errorf("empty_language_code_for_user: %+v", user))
+		return
+	}
+
+	lang, ok := t.languages[user.LanguageCode()]
+	if !ok {
+		t.onErr(update, fmt.Errorf("language_not_found: %s", user.LanguageCode()))
+		return
+	}
+
+	handler(CallbackUpdate[User, Language]{
+		User:     user,
+		Language: lang,
+		Update:   update,
+	}, args...)
 }
 
 func splitCallbackData(data, separator string) (command string, args []string) {
@@ -74,7 +201,7 @@ func splitCallbackData(data, separator string) (command string, args []string) {
 	return split[0], split[1:]
 }
 
-func (t *Telejoon[T]) processPrivateMessage(update tgbotapi.Update) {
+func (t *Telejoon[User, Language]) processPrivateMessage(update tgbotapi.Update) {
 	// check if default state is set
 	if t.handlers.stateHandlers.defaultState == "" {
 		t.onErr(update, fmt.Errorf("empty_user_state"))
@@ -100,13 +227,29 @@ func (t *Telejoon[T]) processPrivateMessage(update tgbotapi.Update) {
 		}
 	}
 
+	if user.LanguageCode() == "" {
+		t.onErr(update, fmt.Errorf("empty_language_code_for_user: %+v", user))
+		return
+	}
+
+	lang, ok := t.languages[user.LanguageCode()]
+	if !ok {
+		t.onErr(update, fmt.Errorf("language_not_found: %s", user.LanguageCode()))
+		return
+	}
+
 	handler := t.handlers.stateHandlers.GetHandler(userState)
 	if handler == nil {
 		t.onErr(update, fmt.Errorf("empty_handler_for_state: %s", userState))
 		return
 	}
 
-	if nextState := handler(user, update, false); nextState != "" {
+	if nextState := handler(StateUpdate[User, Language]{
+		User:       user,
+		Language:   lang,
+		Update:     update,
+		IsSwitched: false,
+	}); nextState != "" {
 		err = t.handlers.stateHandlers.userStateRepository.Update(update.Message.From.Id, nextState)
 		if err != nil {
 			t.onErr(update, fmt.Errorf("update_user_state: %s", err))
@@ -119,6 +262,11 @@ func (t *Telejoon[T]) processPrivateMessage(update tgbotapi.Update) {
 			return
 		}
 
-		_ = handler(user, update, true)
+		_ = handler(StateUpdate[User, Language]{
+			User:       user,
+			Language:   lang,
+			Update:     update,
+			IsSwitched: true,
+		})
 	}
 }
