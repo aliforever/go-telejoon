@@ -1,16 +1,24 @@
 package telejoon
 
-import tgbotapi "github.com/aliforever/go-telegram-bot-api"
+import (
+	"github.com/sirupsen/logrus"
+)
 
 type Options struct {
-	onErr func(update tgbotapi.Update, err error)
+	ErrorGroupID int64
+	Logger       *logrus.Logger
 }
 
 func NewOptions() *Options {
 	return &Options{}
 }
 
-func (o *Options) OnErr(onErr func(update tgbotapi.Update, err error)) *Options {
-	o.onErr = onErr
+func (o *Options) SetLogger(logger *logrus.Logger) *Options {
+	o.Logger = logger
+	return o
+}
+
+func (o *Options) SetErrorGroupID(groupID int64) *Options {
+	o.ErrorGroupID = groupID
 	return o
 }

@@ -1,144 +1,107 @@
 package telejoon_test
 
 import (
+	"context"
 	"fmt"
 	tgbotapi "github.com/aliforever/go-telegram-bot-api"
 	"github.com/aliforever/go-telegram-bot-api/structs"
 	"github.com/aliforever/go-telejoon"
 	"os"
-	"strings"
 	"testing"
 )
 
-type User struct {
+type ExampleUser struct {
 	Id int64
 }
 
-func (u User) LanguageCode() string {
+func (e ExampleUser) FromTgUser(tgUser *structs.User) ExampleUser {
+	return ExampleUser{tgUser.Id}
+}
+
+func (e ExampleUser) LanguageCode() string {
 	return "fa"
 }
 
-// UserRepository is a dummy implementation of UserRepository interface.
-type UserRepository struct{}
+func TestStart(t *testing.T) {
+	var stop = make(chan bool)
 
-func (u *UserRepository) Store(user *structs.User) (User, error) {
-	return User{Id: user.Id}, nil
-}
-
-func (u *UserRepository) Find(id int64) (User, error) {
-	return User{Id: id}, nil
-}
-
-func (u *UserRepository) SetLanguage(id int64, language string) error {
-	return nil
-}
-
-// UserStateRepository is a dummy implementation of UserStateRepository interface.
-type UserStateRepository struct{}
-
-func (u *UserStateRepository) Update(userID int64, state string) error {
-	return nil
-}
-
-func (u *UserStateRepository) Store(id int64, state string) error {
-	return nil
-}
-
-func (u *UserStateRepository) Find(id int64) (string, error) {
-	return "Welcome", nil
-}
-
-type language interface {
-	telejoon.LanguageI
-	Welcome() string
-}
-
-type Farsi struct {
-}
-
-func (f Farsi) Flag() string {
-	return "🇮🇷"
-}
-
-func (f Farsi) Code() string {
-	return "fa"
-}
-
-func (f Farsi) Name() string {
-	return "Farsi"
-}
-
-func (f Farsi) SelectLanguage() string {
-	return "انتخاب زبان"
-}
-
-func (f Farsi) Welcome() string {
-	return "خوش آمدید"
-}
-
-func TestNew(t *testing.T) {
-	botToken := os.Getenv("BOT_TOKEN")
-	if botToken == "" {
-		t.Skip("BOT_TOKEN is not set")
-	}
-
-	c, _ := tgbotapi.New(botToken)
-
-	go func() {
-		err := c.GetUpdates().LongPoll()
-		if err != nil {
-			panic(err)
+	client1 := func() *tgbotapi.TelegramBot {
+		botToken := os.Getenv("BOT_TOKEN")
+		if botToken == "" {
+			t.Skip("BOT_TOKEN is not set")
 		}
+
+		c, err := tgbotapi.New(botToken)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		go func() {
+			err := c.GetUpdates().LongPoll()
+			if err != nil {
+				panic(err)
+			}
+		}()
+
+		return c
 	}()
 
-	ch := telejoon.NewCallbackHandlers[User, language](":").
-		AddHandler("info", func(update telejoon.CallbackUpdate[User, language], args ...string) {
-			c.Send(c.Message().SetChatId(update.User.Id).SetText("info:" + strings.Join(args, " ")))
+	type args struct {
+		client    *tgbotapi.TelegramBot
+		processor telejoon.Processor
+		context   context.Context
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "TestStart",
+			args: args{
+				client: client1,
+
+				processor: telejoon.WithPrivateStateHandlers[ExampleUser](
+					telejoon.NewDefaultUserRepository[ExampleUser](),
+					"Welcome",
+					telejoon.NewOptions().SetErrorGroupID(81997375)).
+					AddStaticHandler("Welcome",
+						telejoon.NewStaticStateHandler[ExampleUser]().
+							AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (string, bool) {
+								update.Set("name", "Ali")
+								return "", true
+							}).
+							ReplyWithText("This is Welcome Menu!").
+							AddButtonText("Hello", "You said Hello").
+							AddButtonText("Bye", "You said Bye").
+							AddButtonState("Show Info", "Info").
+							AddButtonFunc("Dynamic Info",
+								func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) string {
+									client.Send(client.Message().
+										SetChatId(update.User.Id).
+										SetText(fmt.Sprintf("Hello %s\nContex Value: %s\nId: %d",
+											update.Get("name").(string), update.Get("test").(string),
+											update.User.Id)))
+									return ""
+								}),
+					).
+					AddStaticHandler("Info",
+						telejoon.NewStaticStateHandler[ExampleUser]().
+							AddButtonState("Back", "Welcome").
+							ReplyWithText("This is Info Menu!").
+							ReplyWithFunc(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) {
+								client.Send(client.Message().
+									SetText("replied with func").
+									SetChatId(update.User.Id))
+							})),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			telejoon.Start(tt.args.client, tt.args.processor)
 		})
+	}
 
-	sh := telejoon.NewStateHandlers[User, language]("Welcome", &UserRepository{}, &UserStateRepository{}).
-		AddHandler("Welcome", func(update telejoon.StateUpdate[User, language]) string {
-			if !update.IsSwitched {
-				if update.Update.Message.Text == "/info" {
-					return "Info"
-				}
-				if update.Update.Message.Text == "/callback" {
-					c.Send(c.Message().
-						SetChatId(update.User.Id).
-						SetText("Choose an option...").
-						SetReplyMarkup(c.Tools.Keyboards.NewInlineKeyboardFromSlicesOfMaps([][]map[string]string{
-							{{"text": "info:1", "callback_data": "info:1"}},
-						})))
-
-					return ""
-				}
-			}
-
-			c.Send(c.Message().
-				SetChatId(update.User.Id).
-				SetText("Choose an option...").
-				SetReplyMarkup(c.Tools.Keyboards.NewReplyKeyboardFromSlicesOfStrings([][]string{{"/info"}})))
-
-			return ""
-		}).
-		AddHandler("Info", func(update telejoon.StateUpdate[User, language]) string {
-			c.Send(c.Message().SetChatId(update.User.Id).SetText("Info Menu!"))
-
-			return ""
-		})
-
-	d := telejoon.New[User, language](
-		c,
-		telejoon.NewHandlers[User, language]().
-			SetStateHandlers(sh).
-			SetCallbackHandlers(ch),
-		[]language{Farsi{}},
-		telejoon.NewOptions().OnErr(onErr),
-	)
-
-	d.Start()
-}
-
-func onErr(update tgbotapi.Update, err error) {
-	fmt.Println(err)
+	<-stop
 }
