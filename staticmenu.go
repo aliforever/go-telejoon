@@ -28,7 +28,7 @@ type StaticMenu[User any] struct {
 }
 
 // NewStaticMenu creates a new raw StaticMenu[User UserI[User]].
-func NewStaticMenu[User UserI[User]]() *StaticMenu[User] {
+func NewStaticMenu[User any]() *StaticMenu[User] {
 	return &StaticMenu[User]{
 		buttonInlineMenus: make(map[string]string),
 		buttonStates:      make(map[string]string),

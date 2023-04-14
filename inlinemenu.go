@@ -48,7 +48,7 @@ buy:1234
 -> reply with callback
 */
 
-func NewInlineMenu[User UserI[User]]() *InlineMenu[User] {
+func NewInlineMenu[User any]() *InlineMenu[User] {
 	return &InlineMenu[User]{
 		buttonData:        make(map[string]string),
 		buttonAlerts:      make(map[string]*buttonAlert),

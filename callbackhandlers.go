@@ -8,7 +8,7 @@ import (
 var defaultCommandSeparator = ":"
 
 // CallbackHandlers is a struct that holds all the callback handlers
-type CallbackHandlers[User UserI[User]] struct {
+type CallbackHandlers[User any] struct {
 	m sync.Mutex
 	// CommandSeparator is the separator between the command and the arguments
 	//  for example: add_user:ali:1234 will be separated into:
@@ -21,7 +21,7 @@ type CallbackHandlers[User UserI[User]] struct {
 }
 
 // NewCallbackHandlers creates a new instance of CallbackHandlers
-func NewCallbackHandlers[User UserI[User]](separator string) *CallbackHandlers[User] {
+func NewCallbackHandlers[User any](separator string) *CallbackHandlers[User] {
 	if separator == "" {
 		separator = defaultCommandSeparator
 	}
