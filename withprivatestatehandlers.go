@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-type engineWithPrivateStateHandlers[User any] struct {
+type EngineWithPrivateStateHandlers[User any] struct {
 	engine[User, any, any, any]
 
 	userRepository UserRepository[User]
@@ -25,9 +25,9 @@ type engineWithPrivateStateHandlers[User any] struct {
 }
 
 func WithPrivateStateHandlers[User UserI[User]](
-	userRepo UserRepository[User], defaultState string, opts ...*Options) *engineWithPrivateStateHandlers[User] {
+	userRepo UserRepository[User], defaultState string, opts ...*Options) *EngineWithPrivateStateHandlers[User] {
 
-	return &engineWithPrivateStateHandlers[User]{
+	return &EngineWithPrivateStateHandlers[User]{
 		engine: engine[User, any, any, any]{
 			opts: opts,
 		},
@@ -39,8 +39,8 @@ func WithPrivateStateHandlers[User UserI[User]](
 }
 
 // AddStaticMenu adds a static state handler
-func (e *engineWithPrivateStateHandlers[User]) AddStaticMenu(
-	state string, handler *StaticMenu[User]) *engineWithPrivateStateHandlers[User] {
+func (e *EngineWithPrivateStateHandlers[User]) AddStaticMenu(
+	state string, handler *StaticMenu[User]) *EngineWithPrivateStateHandlers[User] {
 
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -50,8 +50,8 @@ func (e *engineWithPrivateStateHandlers[User]) AddStaticMenu(
 	return e
 }
 
-func (e *engineWithPrivateStateHandlers[User]) AddMiddleware(
-	middleware func(*tgbotapi.TelegramBot, *StateUpdate[User]) (string, bool)) *engineWithPrivateStateHandlers[User] {
+func (e *EngineWithPrivateStateHandlers[User]) AddMiddleware(
+	middleware func(*tgbotapi.TelegramBot, *StateUpdate[User]) (string, bool)) *EngineWithPrivateStateHandlers[User] {
 
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -62,8 +62,8 @@ func (e *engineWithPrivateStateHandlers[User]) AddMiddleware(
 }
 
 // AddInlineMenu adds an inline state handler
-func (e *engineWithPrivateStateHandlers[User]) AddInlineMenu(
-	name string, handler *InlineMenu[User]) *engineWithPrivateStateHandlers[User] {
+func (e *EngineWithPrivateStateHandlers[User]) AddInlineMenu(
+	name string, handler *InlineMenu[User]) *EngineWithPrivateStateHandlers[User] {
 
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -73,7 +73,7 @@ func (e *engineWithPrivateStateHandlers[User]) AddInlineMenu(
 	return e
 }
 
-func (e *engineWithPrivateStateHandlers[User]) canProcess(update tgbotapi.Update) bool {
+func (e *EngineWithPrivateStateHandlers[User]) canProcess(update tgbotapi.Update) bool {
 	if chat := update.Chat(); chat != nil && chat.Type == "private" {
 		return true
 	}
@@ -81,7 +81,7 @@ func (e *engineWithPrivateStateHandlers[User]) canProcess(update tgbotapi.Update
 	return false
 }
 
-func (e *engineWithPrivateStateHandlers[User]) process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
+func (e *EngineWithPrivateStateHandlers[User]) process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
 	user, userState, err := e.processUserState(update)
 	if err != nil {
 		e.onErr(client, update, err)
@@ -143,7 +143,7 @@ func (e *engineWithPrivateStateHandlers[User]) process(client *tgbotapi.Telegram
 	}
 }
 
-func (e *engineWithPrivateStateHandlers[User]) processStaticHandler(
+func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 	handler *StaticMenu[User], client *tgbotapi.TelegramBot, update *StateUpdate[User]) {
 
 	from := update.Update.From()
@@ -228,7 +228,7 @@ func (e *engineWithPrivateStateHandlers[User]) processStaticHandler(
 	}
 }
 
-func (e *engineWithPrivateStateHandlers[User]) processInlineHandler(
+func (e *EngineWithPrivateStateHandlers[User]) processInlineHandler(
 	menu *InlineMenu[User], client *tgbotapi.TelegramBot, update *StateUpdate[User], edit bool) {
 
 	from := update.Update.From()
@@ -256,7 +256,7 @@ func (e *engineWithPrivateStateHandlers[User]) processInlineHandler(
 	}
 }
 
-func (e *engineWithPrivateStateHandlers[User]) switchState(
+func (e *EngineWithPrivateStateHandlers[User]) switchState(
 	nextState string, client *tgbotapi.TelegramBot, ctx context.Context, user User, update tgbotapi.Update) error {
 
 	from := update.From()
@@ -278,7 +278,7 @@ func (e *engineWithPrivateStateHandlers[User]) switchState(
 	return fmt.Errorf("no_handler_for_state: %s", nextState)
 }
 
-func (e *engineWithPrivateStateHandlers[User]) processUserState(update tgbotapi.Update) (User, string, error) {
+func (e *EngineWithPrivateStateHandlers[User]) processUserState(update tgbotapi.Update) (User, string, error) {
 	from := update.From()
 
 	user, err := e.userRepository.Find(from.Id)
