@@ -24,7 +24,7 @@ type EngineWithPrivateStateHandlers[User any] struct {
 	inlineMenus map[string]*InlineMenu[User]
 }
 
-func WithPrivateStateHandlers[User UserI[User]](
+func WithPrivateStateHandlers[User any](
 	userRepo UserRepository[User], defaultState string, opts ...*Options) *EngineWithPrivateStateHandlers[User] {
 
 	return &EngineWithPrivateStateHandlers[User]{
