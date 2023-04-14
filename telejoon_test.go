@@ -64,14 +64,15 @@ func TestStart(t *testing.T) {
 					telejoon.NewDefaultUserRepository[ExampleUser](),
 					"Welcome",
 					telejoon.NewOptions().SetErrorGroupID(81997375)).
-					AddStaticHandler("Welcome",
-						telejoon.NewStaticStateHandler[ExampleUser]().
+					AddStaticMenu("Welcome",
+						telejoon.NewStaticMenu[ExampleUser]().
 							AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (string, bool) {
 								update.Set("name", "Ali")
 								return "", true
 							}).
 							ReplyWithText("This is Welcome Menu!").
 							AddButtonText("Hello", "You said Hello").
+							AddButtonInlineMenu("Inline", "Info").
 							AddButtonText("Bye", "You said Bye").
 							AddButtonState("Show Info", "Info").
 							AddButtonFunc("Dynamic Info",
@@ -84,15 +85,28 @@ func TestStart(t *testing.T) {
 									return ""
 								}),
 					).
-					AddStaticHandler("Info",
-						telejoon.NewStaticStateHandler[ExampleUser]().
+					AddStaticMenu("Info",
+						telejoon.NewStaticMenu[ExampleUser]().
 							AddButtonState("Back", "Welcome").
 							ReplyWithText("This is Info Menu!").
 							ReplyWithFunc(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) {
 								client.Send(client.Message().
 									SetText("replied with func").
 									SetChatId(update.User.Id))
-							})),
+							})).
+					AddInlineMenu("Info", telejoon.NewInlineMenu[ExampleUser]().
+						AddButtonUrl("Google", "https://google.com").
+						AddDataButtonAlert("Hello", "say_hello", "Hello Friend", false).
+						AddDataButtonAlert("Hello 2", "say_hello_2", "Hello Friend 2", false).
+						AddDataButtonAlert("Hello 3", "say_hello_3", "Hello Friend 3", true).
+						AddButtonInlineMenu("Change Menu to Info 2", "Info2", true).
+						SetMaxButtonPerRow(3).
+						// SetButtonFormation(1, 3).
+						AddReplyText("Info Inline Menu")).
+					AddInlineMenu("Info2", telejoon.NewInlineMenu[ExampleUser]().
+						AddDataButtonAlert("Hello", "say_hello", "Hello Friend", false).
+						AddButtonInlineMenu("Back", "Info", true).
+						AddReplyText("Info2 Inline Menu")),
 			},
 		},
 	}

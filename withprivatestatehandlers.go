@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	tgbotapi "github.com/aliforever/go-telegram-bot-api"
+	"strings"
 	"sync"
 )
 
@@ -18,7 +19,9 @@ type engineWithPrivateStateHandlers[User any] struct {
 
 	defaultStateName string
 
-	staticHandlers map[string]*StaticStateHandler[User]
+	staticMenus map[string]*StaticMenu[User]
+
+	inlineMenus map[string]*InlineMenu[User]
 }
 
 func WithPrivateStateHandlers[User UserI[User]](
@@ -30,18 +33,19 @@ func WithPrivateStateHandlers[User UserI[User]](
 		},
 		userRepository:   userRepo,
 		defaultStateName: defaultState,
-		staticHandlers:   map[string]*StaticStateHandler[User]{},
+		staticMenus:      map[string]*StaticMenu[User]{},
+		inlineMenus:      map[string]*InlineMenu[User]{},
 	}
 }
 
-// AddStaticHandler adds a static state handler
-func (e *engineWithPrivateStateHandlers[User]) AddStaticHandler(
-	state string, handler *StaticStateHandler[User]) *engineWithPrivateStateHandlers[User] {
+// AddStaticMenu adds a static state handler
+func (e *engineWithPrivateStateHandlers[User]) AddStaticMenu(
+	state string, handler *StaticMenu[User]) *engineWithPrivateStateHandlers[User] {
 
 	e.m.Lock()
 	defer e.m.Unlock()
 
-	e.staticHandlers[state] = handler
+	e.staticMenus[state] = handler
 
 	return e
 }
@@ -53,6 +57,18 @@ func (e *engineWithPrivateStateHandlers[User]) AddMiddleware(
 	defer e.m.Unlock()
 
 	e.middlewares = append(e.middlewares, middleware)
+
+	return e
+}
+
+// AddInlineMenu adds an inline state handler
+func (e *engineWithPrivateStateHandlers[User]) AddInlineMenu(
+	name string, handler *InlineMenu[User]) *engineWithPrivateStateHandlers[User] {
+
+	e.m.Lock()
+	defer e.m.Unlock()
+
+	e.inlineMenus[name] = handler
 
 	return e
 }
@@ -91,14 +107,44 @@ func (e *engineWithPrivateStateHandlers[User]) process(client *tgbotapi.Telegram
 		}
 	}
 
-	if handler := e.staticHandlers[userState]; handler != nil {
-		e.processStaticHandler(handler, client, su)
-		return
+	if update.Message != nil {
+		if handler := e.staticMenus[userState]; handler != nil {
+			e.processStaticHandler(handler, client, su)
+			return
+		}
+	}
+
+	if update.CallbackQuery != nil {
+		// client.Send(client.Message().SetText(string(j)).SetChatId(update.From().Id))
+		if update.CallbackQuery.Data == "" {
+			return
+		}
+
+		data := strings.Split(update.CallbackQuery.Data, ":")
+
+		command := data[0]
+
+		for _, menu := range e.inlineMenus {
+			if dba, ok := menu.buttonAlerts[command]; ok {
+				_, _ = client.Send(client.AnswerCallbackQuery().
+					SetCallbackQueryId(update.CallbackQuery.Id).
+					SetText(dba.text).
+					SetShowAlert(dba.showAlert))
+				return
+			}
+
+			if inlineMenu, ok := menu.buttonInlineMenus[command]; ok {
+				if inlineMenuHandler, ok := e.inlineMenus[inlineMenu.data]; ok {
+					e.processInlineHandler(inlineMenuHandler, client, su, inlineMenu.edit)
+					return
+				}
+			}
+		}
 	}
 }
 
 func (e *engineWithPrivateStateHandlers[User]) processStaticHandler(
-	handler *StaticStateHandler[User], client *tgbotapi.TelegramBot, update *StateUpdate[User]) {
+	handler *StaticMenu[User], client *tgbotapi.TelegramBot, update *StateUpdate[User]) {
 
 	from := update.Update.From()
 
@@ -110,7 +156,7 @@ func (e *engineWithPrivateStateHandlers[User]) processStaticHandler(
 						fmt.Errorf("error_setting_user_state: %d, %w", from.Id, err))
 					return
 				}
-				e.processStaticHandler(e.staticHandlers[nextState], client, &StateUpdate[User]{
+				e.processStaticHandler(e.staticMenus[nextState], client, &StateUpdate[User]{
 					context:    update.context,
 					State:      nextState,
 					User:       update.User,
@@ -152,6 +198,15 @@ func (e *engineWithPrivateStateHandlers[User]) processStaticHandler(
 				}
 				return
 			}
+
+			if inlineMenu := handler.getInlineMenuForButton(update.Update.Message.Text); inlineMenu != "" {
+				if menu, ok := e.inlineMenus[inlineMenu]; !ok {
+					e.onErr(client, update.Update, fmt.Errorf("inline_menu_not_found: %s", inlineMenu))
+				} else {
+					e.processInlineHandler(menu, client, update, false)
+				}
+				return
+			}
 		}
 	}
 
@@ -173,12 +228,40 @@ func (e *engineWithPrivateStateHandlers[User]) processStaticHandler(
 	}
 }
 
+func (e *engineWithPrivateStateHandlers[User]) processInlineHandler(
+	menu *InlineMenu[User], client *tgbotapi.TelegramBot, update *StateUpdate[User], edit bool) {
+
+	from := update.Update.From()
+
+	markup := menu.getInlineKeyboardMarkup()
+
+	if menu.replyText != "" {
+		var cfg tgbotapi.Config
+
+		if edit {
+			cfg = client.EditMessageText().SetText(menu.replyText).
+				SetChatId(from.Id).
+				SetMessageId(update.Update.CallbackQuery.Message.MessageId).
+				SetReplyMarkup(markup)
+		} else {
+			cfg = client.Message().SetText(menu.replyText).SetChatId(from.Id).SetReplyMarkup(markup)
+		}
+
+		_, err := client.Send(cfg)
+		if err != nil {
+			e.onErr(client, update.Update,
+				fmt.Errorf("error_sending_message_to_user: %d, %w", from.Id, err))
+			return
+		}
+	}
+}
+
 func (e *engineWithPrivateStateHandlers[User]) switchState(
 	nextState string, client *tgbotapi.TelegramBot, ctx context.Context, user User, update tgbotapi.Update) error {
 
 	from := update.From()
 
-	if handler := e.staticHandlers[nextState]; handler != nil {
+	if handler := e.staticMenus[nextState]; handler != nil {
 		if err := e.userRepository.SetState(from.Id, nextState); err != nil {
 			return fmt.Errorf("error_setting_user_state: %d, %w", from.Id, err)
 		}
