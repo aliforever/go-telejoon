@@ -72,9 +72,9 @@ type Languages struct {
 // getByTag returns the localizer by the given tag.
 func (l *Languages) getByTag(tag string) *Language {
 	for index := range l.localizers {
-		localizer := &l.localizers[index]
+		localizer := l.localizers[index]
 		if localizer.tag == tag {
-			return localizer
+			return &localizer
 		}
 	}
 
@@ -105,7 +105,8 @@ func (lb *LanguagesBuilder) RegisterTomlFormat(tomlFilePaths []string) *Language
 func (lb *LanguagesBuilder) Build() (*Languages, error) {
 	localizers := []Language{}
 
-	for _, path := range lb.messageFilePaths {
+	for i := range lb.messageFilePaths {
+		path := lb.messageFilePaths[i]
 		if msgFile, err := lb.defaultBundle.LoadMessageFile(path); err != nil {
 			return nil, err
 		} else {

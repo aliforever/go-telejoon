@@ -142,7 +142,8 @@ func (e *EngineWithPrivateStateHandlers[User]) process(client *tgbotapi.Telegram
 		if err != nil {
 			if err == UserLanguageNotFoundErr && e.languageConfig.forceChooseLanguage {
 				if userState != e.languageConfig.changeLanguageState {
-					err = e.switchState(e.languageConfig.changeLanguageState, client, context.Background(), user, update)
+					err = e.switchState(
+						e.languageConfig.changeLanguageState, client, context.Background(), user, nil, update)
 					if err != nil {
 						e.onErr(client, update, err)
 					}
@@ -169,7 +170,7 @@ func (e *EngineWithPrivateStateHandlers[User]) process(client *tgbotapi.Telegram
 	for _, f := range e.middlewares {
 		if nextState, ok := f(client, su); !ok {
 			if nextState != "" {
-				if err := e.switchState(nextState, client, su.context, user, update); err != nil {
+				if err := e.switchState(nextState, client, su.context, user, lang, update); err != nil {
 					e.onErr(client, update, err)
 				}
 			}
@@ -254,7 +255,9 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 			}
 
 			if nextState := handler.getStateForButton(update.Update.Message.Text); nextState != "" {
-				if err := e.switchState(nextState, client, update.context, update.User, update.Update); err != nil {
+				if err := e.switchState(
+					nextState, client, update.context, update.User, update.Language, update.Update); err != nil {
+
 					e.onErr(client, update.Update, err)
 				}
 				return
@@ -262,7 +265,9 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 
 			if fn := handler.getFuncForButton(update.Update.Message.Text); fn != nil {
 				if nextState := fn(client, update); nextState != "" {
-					if err := e.switchState(nextState, client, update.context, update.User, update.Update); err != nil {
+					if err := e.switchState(
+						nextState, client, update.context, update.User, update.Language, update.Update); err != nil {
+
 						e.onErr(client, update.Update, err)
 					}
 				}
@@ -350,7 +355,8 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineHandler(
 }
 
 func (e *EngineWithPrivateStateHandlers[User]) switchState(
-	nextState string, client *tgbotapi.TelegramBot, ctx context.Context, user User, update tgbotapi.Update) error {
+	nextState string, client *tgbotapi.TelegramBot, ctx context.Context, user User,
+	language *Language, update tgbotapi.Update) error {
 
 	from := update.From()
 
@@ -361,6 +367,7 @@ func (e *EngineWithPrivateStateHandlers[User]) switchState(
 		e.processStaticHandler(handler, client, &StateUpdate[User]{
 			context:    ctx,
 			State:      nextState,
+			Language:   language,
 			User:       user,
 			Update:     update,
 			IsSwitched: true,
