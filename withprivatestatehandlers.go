@@ -87,7 +87,9 @@ func (e *EngineWithPrivateStateHandlers[User]) WithLanguageConfig(
 
 	menu := NewStaticMenu[User]()
 
-	for _, lang := range cfg.languages.localizers {
+	for i := range cfg.languages.localizers {
+		lang := cfg.languages.localizers[i]
+
 		btnText, _ := lang.Get(fmt.Sprintf("%s.Button", cfg.changeLanguageState))
 		if btnText == "" {
 			btnText = lang.tag
@@ -100,6 +102,9 @@ func (e *EngineWithPrivateStateHandlers[User]) WithLanguageConfig(
 					e.onErr(bot, update.Update, err)
 					return ""
 				}
+
+				// TODO: maybe access to update should be protected and through getters, only a setter to change language
+				update.Language = &lang
 
 				return e.defaultStateName
 			})

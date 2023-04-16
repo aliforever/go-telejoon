@@ -85,7 +85,7 @@ func TestStart(t *testing.T) {
 								return "", true
 							}).
 							AddButtonState("Change Language", "ChangeLanguage").
-							ReplyWithText("This is Welcome Menu!").
+							ReplyWithLanguageKey("Welcome.Main").
 							AddButtonText("Hello", "You said Hello").
 							AddButtonInlineMenu("Inline", "Info").
 							AddButtonText("Bye", "You said Bye").
