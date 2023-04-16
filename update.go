@@ -9,7 +9,7 @@ type StateUpdate[User any] struct {
 	context    context.Context
 	State      string
 	User       User
-	Language   Language
+	Language   *Language
 	Update     tgbotapi.Update
 	IsSwitched bool
 }

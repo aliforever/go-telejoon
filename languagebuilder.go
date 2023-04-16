@@ -70,14 +70,15 @@ type Languages struct {
 }
 
 // getByTag returns the localizer by the given tag.
-func (l *Languages) getByTag(tag string) Language {
-	for _, localizer := range l.localizers {
+func (l *Languages) getByTag(tag string) *Language {
+	for index := range l.localizers {
+		localizer := &l.localizers[index]
 		if localizer.tag == tag {
 			return localizer
 		}
 	}
 
-	return Language{}
+	return nil
 }
 
 type LanguagesBuilder struct {

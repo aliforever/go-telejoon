@@ -135,7 +135,7 @@ func (e *EngineWithPrivateStateHandlers[User]) process(client *tgbotapi.Telegram
 		return
 	}
 
-	var lang Language
+	var lang *Language
 
 	if e.languageConfig != nil {
 		userLanguage, err := e.languageConfig.repo.GetUserLanguage(update.From().Id)
@@ -295,7 +295,7 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 
 	if replyLanguageKey := handler.getReplyTextLanguageKey(); replyLanguageKey != "" {
 		var txt string
-		if e.languageConfig == nil && update.Language.tag == "" {
+		if update.Language == nil {
 			txt = replyLanguageKey
 		} else {
 			result, err := update.Language.Get(replyLanguageKey)
