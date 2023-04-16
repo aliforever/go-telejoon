@@ -6,6 +6,7 @@ import (
 	tgbotapi "github.com/aliforever/go-telegram-bot-api"
 	"github.com/aliforever/go-telegram-bot-api/structs"
 	"github.com/aliforever/go-telejoon"
+	"golang.org/x/text/language"
 	"os"
 	"testing"
 )
@@ -46,6 +47,18 @@ func TestStart(t *testing.T) {
 		return c
 	}()
 
+	languages, err := telejoon.NewLanguageBuilder(language.English).
+		RegisterTomlFormat([]string{
+			`C:\golang\src\github.com\aliforever\go-telejoon\locale.en.toml`,
+			`C:\golang\src\github.com\aliforever\go-telejoon\locale.fa.toml`,
+		}).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	languageConfig := telejoon.NewLanguageConfig(languages, telejoon.NewDefaultUserLanguageRepository()).
+		WithChangeLanguageMenu("ChangeLanguage")
+
 	type args struct {
 		client    *tgbotapi.TelegramBot
 		processor telejoon.Processor
@@ -64,12 +77,14 @@ func TestStart(t *testing.T) {
 					telejoon.NewDefaultUserRepository[ExampleUser](),
 					"Welcome",
 					telejoon.NewOptions().SetErrorGroupID(81997375)).
+					WithLanguageConfig(languageConfig).
 					AddStaticMenu("Welcome",
 						telejoon.NewStaticMenu[ExampleUser]().
 							AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (string, bool) {
 								update.Set("name", "Ali")
 								return "", true
 							}).
+							AddButtonState("Change Language", "ChangeLanguage").
 							ReplyWithText("This is Welcome Menu!").
 							AddButtonText("Hello", "You said Hello").
 							AddButtonInlineMenu("Inline", "Info").

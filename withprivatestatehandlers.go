@@ -22,6 +22,8 @@ type EngineWithPrivateStateHandlers[User any] struct {
 	staticMenus map[string]*StaticMenu[User]
 
 	inlineMenus map[string]*InlineMenu[User]
+
+	languageConfig *LanguageConfig
 }
 
 func WithPrivateStateHandlers[User any](
@@ -71,6 +73,51 @@ func (e *EngineWithPrivateStateHandlers[User]) AddInlineMenu(
 	e.inlineMenus[name] = handler
 
 	return e
+}
+
+// WithLanguageConfig adds a language config to the engine
+func (e *EngineWithPrivateStateHandlers[User]) WithLanguageConfig(
+	cfg *LanguageConfig) *EngineWithPrivateStateHandlers[User] {
+
+	e.languageConfig = cfg
+
+	if cfg.changeLanguageState == "" {
+		return e
+	}
+
+	menu := NewStaticMenu[User]()
+
+	for _, lang := range cfg.languages.localizers {
+		btnText, _ := lang.Get(fmt.Sprintf("%s.Button", cfg.changeLanguageState))
+		if btnText == "" {
+			btnText = lang.tag
+		}
+
+		menu.AddButtonFunc(btnText,
+			func(bot *tgbotapi.TelegramBot, update *StateUpdate[User]) string {
+				err := cfg.repo.SetUserLanguage(update.Update.From().Id, lang.tag)
+				if err != nil {
+					e.onErr(bot, update.Update, err)
+					return ""
+				}
+
+				return e.defaultStateName
+			})
+	}
+
+	text := ""
+	for _, lang := range cfg.languages.localizers {
+		txt, _ := lang.Get(fmt.Sprintf("%s.Text", cfg.changeLanguageState))
+		if txt == "" {
+			txt = cfg.changeLanguageState
+		}
+
+		text += fmt.Sprintf("%s\n", txt)
+	}
+
+	menu.ReplyWithText(text)
+
+	return e.AddStaticMenu(cfg.changeLanguageState, menu)
 }
 
 func (e *EngineWithPrivateStateHandlers[User]) canProcess(update tgbotapi.Update) bool {
