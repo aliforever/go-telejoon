@@ -1,6 +1,11 @@
 package telejoon
 
-import "sync"
+import (
+	"errors"
+	"sync"
+)
+
+var UserLanguageNotFoundErr = errors.New("user_language_not_found")
 
 type UserLanguageRepository interface {
 	SetUserLanguage(userID int64, languageTag string) error

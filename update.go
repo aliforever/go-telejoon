@@ -9,6 +9,7 @@ type StateUpdate[User any] struct {
 	context    context.Context
 	State      string
 	User       User
+	Language   Language
 	Update     tgbotapi.Update
 	IsSwitched bool
 }
@@ -22,11 +23,3 @@ func (s *StateUpdate[User]) Set(key, value interface{}) {
 func (s *StateUpdate[User]) Get(key interface{}) interface{} {
 	return s.context.Value(key)
 }
-
-/*type StateUpdateWithLanguage[User UserI[User], Lang LanguageI] struct {
-	State      string
-	User       User
-	Language   Lang
-	Update     tgbotapi.Update
-	IsSwitched bool
-}*/

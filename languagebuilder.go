@@ -10,6 +10,7 @@ type LanguageConfig struct {
 	languages *Languages
 	repo      UserLanguageRepository
 
+	forceChooseLanguage bool
 	changeLanguageState string
 }
 
@@ -21,8 +22,10 @@ func NewLanguageConfig(languages *Languages, repo UserLanguageRepository) *Langu
 }
 
 // WithChangeLanguageMenu sets the change language menu state.
-func (l *LanguageConfig) WithChangeLanguageMenu(state string) *LanguageConfig {
+func (l *LanguageConfig) WithChangeLanguageMenu(state string, forceChooseLanguage bool) *LanguageConfig {
 	l.changeLanguageState = state
+	l.forceChooseLanguage = forceChooseLanguage
+
 	return l
 }
 
@@ -67,10 +70,10 @@ type Languages struct {
 	localizers []Language
 }
 
-// GetByTag returns the localizer by the given tag.
-func (l *Languages) GetByTag(tag language.Tag) Language {
+// getByTag returns the localizer by the given tag.
+func (l *Languages) getByTag(tag string) Language {
 	for _, localizer := range l.localizers {
-		if localizer.tag == tag.String() {
+		if localizer.tag == tag {
 			return localizer
 		}
 	}
