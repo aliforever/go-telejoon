@@ -57,7 +57,7 @@ func TestStart(t *testing.T) {
 	}
 
 	languageConfig := telejoon.NewLanguageConfig(languages, telejoon.NewDefaultUserLanguageRepository()).
-		WithChangeLanguageMenu("ChangeLanguage")
+		WithChangeLanguageMenu("ChangeLanguage", true)
 
 	type args struct {
 		client    *tgbotapi.TelegramBot

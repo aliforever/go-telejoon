@@ -141,16 +141,17 @@ func (e *EngineWithPrivateStateHandlers[User]) process(client *tgbotapi.Telegram
 		userLanguage, err := e.languageConfig.repo.GetUserLanguage(update.From().Id)
 		if err != nil {
 			if err == UserLanguageNotFoundErr && e.languageConfig.forceChooseLanguage {
-				err = e.switchState(e.languageConfig.changeLanguageState, client, context.Background(), user, update)
-				if err != nil {
-					e.onErr(client, update, err)
+				if userState != e.languageConfig.changeLanguageState {
+					err = e.switchState(e.languageConfig.changeLanguageState, client, context.Background(), user, update)
+					if err != nil {
+						e.onErr(client, update, err)
+					}
+					return
 				}
+			} else {
+				e.onErr(client, update, err)
 				return
 			}
-
-			e.onErr(client, update, err)
-
-			return
 		}
 
 		lang = e.languageConfig.languages.getByTag(userLanguage)

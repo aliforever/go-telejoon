@@ -36,5 +36,5 @@ func (u *DefaultUserLanguageRepository) GetUserLanguage(userID int64) (string, e
 		return language.(string), nil
 	}
 
-	return "", nil
+	return "", UserLanguageNotFoundErr
 }
