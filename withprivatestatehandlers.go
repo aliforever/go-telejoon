@@ -293,6 +293,29 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 		}
 	}
 
+	if replyLanguageKey := handler.getReplyTextLanguageKey(); replyLanguageKey != "" {
+		var txt string
+		if e.languageConfig == nil && update.Language.tag == "" {
+			txt = replyLanguageKey
+		} else {
+			result, err := update.Language.Get(replyLanguageKey)
+			if err == nil {
+				txt = result
+			}
+		}
+
+		cfg := client.Message().SetText(txt).SetChatId(from.Id)
+		if replyMarkup != nil {
+			cfg = cfg.SetReplyMarkup(replyMarkup)
+		}
+		_, err := client.Send(cfg)
+		if err != nil {
+			e.onErr(client, update.Update,
+				fmt.Errorf("error_sending_message_to_user: %d, %w", from.Id, err))
+			return
+		}
+	}
+
 	if replyWithFunc := handler.getReplyWithFunc(); replyWithFunc != nil {
 		replyWithFunc(client, update)
 	}

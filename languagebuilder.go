@@ -43,10 +43,9 @@ func (l *Language) Get(id string) (string, error) {
 
 // MustGet returns the localized string for the given message ID.
 // If the message ID is not found, it will panic.
-func (l *Language) MustGet(id string, args ...interface{}) string {
+func (l *Language) MustGet(id string) string {
 	return l.localizer.MustLocalize(&i18n.LocalizeConfig{
-		MessageID:    id,
-		TemplateData: args,
+		MessageID: id,
 	})
 }
 

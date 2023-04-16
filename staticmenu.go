@@ -11,7 +11,8 @@ import (
 type StaticMenu[User any] struct {
 	lock sync.Mutex
 
-	replyText string
+	replyText            string
+	replyWithLanguageKey string
 
 	replyWithFunc func(*tgbotapi.TelegramBot, *StateUpdate[User])
 
@@ -149,6 +150,14 @@ func (s *StaticMenu[User]) ReplyWithText(text string) *StaticMenu[User] {
 	return s
 }
 
+func (s *StaticMenu[User]) ReplyWithLanguageKey(key string) *StaticMenu[User] {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.replyWithLanguageKey = key
+	return s
+}
+
 func (s *StaticMenu[User]) ReplyWithFunc(
 	f func(*tgbotapi.TelegramBot, *StateUpdate[User])) *StaticMenu[User] {
 
@@ -189,6 +198,13 @@ func (s *StaticMenu[User]) getReplyText() string {
 	defer s.lock.Unlock()
 
 	return s.replyText
+}
+
+func (s *StaticMenu[User]) getReplyTextLanguageKey() string {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.replyWithLanguageKey
 }
 
 func (s *StaticMenu[User]) getReplyWithFunc() func(*tgbotapi.TelegramBot, *StateUpdate[User]) {
