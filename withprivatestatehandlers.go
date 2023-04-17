@@ -191,29 +191,35 @@ func (e *EngineWithPrivateStateHandlers[User]) process(client *tgbotapi.Telegram
 	}
 
 	if update.CallbackQuery != nil {
-		// client.Send(client.Message().SetText(string(j)).SetChatId(update.From().Id))
-		if update.CallbackQuery.Data == "" {
+		e.processCallbackQuery(client, su)
+		return
+	}
+}
+
+func (e *EngineWithPrivateStateHandlers[User]) processCallbackQuery(
+	client *tgbotapi.TelegramBot, update *StateUpdate[User]) {
+
+	if update.Update.CallbackQuery.Data == "" {
+		return
+	}
+
+	data := strings.Split(update.Update.CallbackQuery.Data, ":")
+
+	command := data[0]
+
+	for _, menu := range e.inlineMenus {
+		if dba, ok := menu.buttonAlerts[command]; ok {
+			_, _ = client.Send(client.AnswerCallbackQuery().
+				SetCallbackQueryId(update.Update.CallbackQuery.Id).
+				SetText(dba.text).
+				SetShowAlert(dba.showAlert))
 			return
 		}
 
-		data := strings.Split(update.CallbackQuery.Data, ":")
-
-		command := data[0]
-
-		for _, menu := range e.inlineMenus {
-			if dba, ok := menu.buttonAlerts[command]; ok {
-				_, _ = client.Send(client.AnswerCallbackQuery().
-					SetCallbackQueryId(update.CallbackQuery.Id).
-					SetText(dba.text).
-					SetShowAlert(dba.showAlert))
+		if inlineMenu, ok := menu.buttonInlineMenus[command]; ok {
+			if inlineMenuHandler, ok := e.inlineMenus[inlineMenu.data]; ok {
+				e.processInlineHandler(inlineMenuHandler, client, update, inlineMenu.edit)
 				return
-			}
-
-			if inlineMenu, ok := menu.buttonInlineMenus[command]; ok {
-				if inlineMenuHandler, ok := e.inlineMenus[inlineMenu.data]; ok {
-					e.processInlineHandler(inlineMenuHandler, client, su, inlineMenu.edit)
-					return
-				}
 			}
 		}
 	}
@@ -245,11 +251,19 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 		}
 	}
 
-	replyMarkup := handler.buildButtonKeyboard()
-
 	if update.Update.Message != nil && update.Update.Message.Text != "" {
 		if !update.IsSwitched {
-			if response := handler.getReplyTextForButton(update.Update.Message.Text); response != "" {
+			buttonText := update.Update.Message.Text
+
+			if update.Language != nil {
+				if languageValueKeys := handler.languageValueButtonKeys(update.Language); languageValueKeys != nil {
+					if languageValueKey := languageValueKeys[buttonText]; languageValueKey != "" {
+						buttonText = languageValueKey
+					}
+				}
+			}
+
+			if response := handler.getReplyTextForButton(buttonText); response != "" {
 				_, err := client.Send(client.Message().SetText(response).SetChatId(from.Id))
 				if err != nil {
 					e.onErr(client, update.Update,
@@ -259,7 +273,7 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 				return
 			}
 
-			if nextState := handler.getStateForButton(update.Update.Message.Text); nextState != "" {
+			if nextState := handler.getStateForButton(buttonText); nextState != "" {
 				if err := e.switchState(
 					nextState, client, update.context, update.User, update.Language, update.Update); err != nil {
 
@@ -268,7 +282,7 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 				return
 			}
 
-			if fn := handler.getFuncForButton(update.Update.Message.Text); fn != nil {
+			if fn := handler.getFuncForButton(buttonText); fn != nil {
 				if nextState := fn(client, update); nextState != "" {
 					if err := e.switchState(
 						nextState, client, update.context, update.User, update.Language, update.Update); err != nil {
@@ -279,7 +293,7 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 				return
 			}
 
-			if inlineMenu := handler.getInlineMenuForButton(update.Update.Message.Text); inlineMenu != "" {
+			if inlineMenu := handler.getInlineMenuForButton(buttonText); inlineMenu != "" {
 				if menu, ok := e.inlineMenus[inlineMenu]; !ok {
 					e.onErr(client, update.Update, fmt.Errorf("inline_menu_not_found: %s", inlineMenu))
 				} else {
@@ -289,6 +303,8 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 			}
 		}
 	}
+
+	replyMarkup := handler.buildButtonKeyboard(update.Language)
 
 	if replyText := handler.getReplyText(); replyText != "" {
 		cfg := client.Message().SetText(replyText).SetChatId(from.Id)
@@ -336,7 +352,7 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineHandler(
 
 	from := update.Update.From()
 
-	markup := menu.getInlineKeyboardMarkup()
+	markup := menu.getInlineKeyboardMarkup(update.Language)
 
 	if menu.replyText != "" {
 		var cfg tgbotapi.Config

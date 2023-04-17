@@ -16,10 +16,11 @@ type StaticMenu[User any] struct {
 
 	replyWithFunc func(*tgbotapi.TelegramBot, *StateUpdate[User])
 
-	buttonInlineMenus map[string]string
-	buttonTexts       map[string]string
-	buttonStates      map[string]string
-	buttonFuncs       map[string]func(*tgbotapi.TelegramBot, *StateUpdate[User]) string
+	buttonInlineMenus  map[string]string
+	buttonTexts        map[string]string
+	buttonStates       map[string]string
+	buttonFuncs        map[string]func(*tgbotapi.TelegramBot, *StateUpdate[User]) string
+	languageKeyButtons map[string]bool
 
 	middlewares []func(*tgbotapi.TelegramBot, *StateUpdate[User]) (string, bool)
 
@@ -31,10 +32,11 @@ type StaticMenu[User any] struct {
 // NewStaticMenu creates a new raw StaticMenu[User UserI[User]].
 func NewStaticMenu[User any]() *StaticMenu[User] {
 	return &StaticMenu[User]{
-		buttonInlineMenus: make(map[string]string),
-		buttonStates:      make(map[string]string),
-		buttonFuncs:       make(map[string]func(*tgbotapi.TelegramBot, *StateUpdate[User]) string),
-		buttonTexts:       make(map[string]string),
+		buttonInlineMenus:  make(map[string]string),
+		buttonStates:       make(map[string]string),
+		buttonFuncs:        make(map[string]func(*tgbotapi.TelegramBot, *StateUpdate[User]) string),
+		buttonTexts:        make(map[string]string),
+		languageKeyButtons: make(map[string]bool),
 	}
 }
 
@@ -110,6 +112,64 @@ func (s *StaticMenu[User]) AddButtonFunc(
 	return s
 }
 
+// AddLanguageKeyButtonInlineMenu adds a new reply button inline menu to the handler.
+func (s *StaticMenu[User]) AddLanguageKeyButtonInlineMenu(button, menu string) *StaticMenu[User] {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.buttonInlineMenus[button] = menu
+
+	s.buttons = append(s.buttons, button)
+
+	s.languageKeyButtons[button] = true
+
+	return s
+}
+
+// AddLanguageKeyButtonText adds a new reply button text to the handler.
+func (s *StaticMenu[User]) AddLanguageKeyButtonText(button, text string) *StaticMenu[User] {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.buttonTexts[button] = text
+
+	s.buttons = append(s.buttons, button)
+
+	s.languageKeyButtons[button] = true
+
+	return s
+}
+
+// AddLanguageKeyButtonState adds a new reply button state to the handler.
+func (s *StaticMenu[User]) AddLanguageKeyButtonState(button, state string) *StaticMenu[User] {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.buttonStates[button] = state
+
+	s.buttons = append(s.buttons, button)
+
+	s.languageKeyButtons[button] = true
+
+	return s
+}
+
+// AddLanguageKeyButtonFunc adds a new reply button func to the handler.
+func (s *StaticMenu[User]) AddLanguageKeyButtonFunc(
+	button string, f func(*tgbotapi.TelegramBot, *StateUpdate[User]) string) *StaticMenu[User] {
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.buttonFuncs[button] = f
+
+	s.buttons = append(s.buttons, button)
+
+	s.languageKeyButtons[button] = true
+
+	return s
+}
+
 // AddCommandText adds a new reply button text to the handler.
 func (s *StaticMenu[User]) AddCommandText(button, text string) *StaticMenu[User] {
 	s.lock.Lock()
@@ -168,7 +228,7 @@ func (s *StaticMenu[User]) ReplyWithFunc(
 	return s
 }
 
-func (s *StaticMenu[User]) buildButtonKeyboard() *structs.ReplyKeyboardMarkup {
+func (s *StaticMenu[User]) buildButtonKeyboard(language *Language) *structs.ReplyKeyboardMarkup {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -176,7 +236,24 @@ func (s *StaticMenu[User]) buildButtonKeyboard() *structs.ReplyKeyboardMarkup {
 		return nil
 	}
 
-	return tools.Keyboards{}.NewReplyKeyboardFromSliceOfStrings(s.buttons, 2)
+	var newButtons = make([]string, len(s.buttons))
+
+	for i, button := range s.buttons {
+		newButtons[i] = button
+	}
+
+	if language != nil {
+		for i, button := range newButtons {
+			if s.languageKeyButtons[button] {
+				btnText, err := language.Get(button)
+				if err == nil {
+					newButtons[i] = btnText
+				}
+			}
+		}
+	}
+
+	return tools.Keyboards{}.NewReplyKeyboardFromSliceOfStrings(newButtons, 2)
 }
 
 func (s *StaticMenu[User]) getReplyTextForButton(button string) string {
@@ -226,4 +303,22 @@ func (s *StaticMenu[User]) getInlineMenuForButton(btn string) string {
 	defer s.lock.Unlock()
 
 	return s.buttonInlineMenus[btn]
+}
+
+func (s *StaticMenu[User]) languageValueButtonKeys(language *Language) map[string]string {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	var valueKeys = make(map[string]string)
+
+	for k := range s.languageKeyButtons {
+		keyValue, err := language.Get(k)
+		if err != nil {
+			valueKeys[k] = k
+		} else {
+			valueKeys[keyValue] = k
+		}
+	}
+
+	return valueKeys
 }

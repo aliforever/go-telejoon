@@ -34,7 +34,8 @@ type InlineMenu[User any] struct {
 	buttonAlerts      map[string]*buttonAlert
 	buttonInlineMenus map[string]*buttonInlineMenu
 
-	buttons []string
+	buttons            []string
+	languageKeyButtons map[string]bool
 
 	buttonFormation []int
 	maxButtonPerRow int
@@ -50,10 +51,11 @@ buy:1234
 
 func NewInlineMenu[User any]() *InlineMenu[User] {
 	return &InlineMenu[User]{
-		buttonData:        make(map[string]string),
-		buttonAlerts:      make(map[string]*buttonAlert),
-		buttonUrls:        make(map[string]string),
-		buttonInlineMenus: make(map[string]*buttonInlineMenu),
+		buttonData:         make(map[string]string),
+		buttonAlerts:       make(map[string]*buttonAlert),
+		buttonUrls:         make(map[string]string),
+		buttonInlineMenus:  make(map[string]*buttonInlineMenu),
+		languageKeyButtons: make(map[string]bool),
 	}
 }
 
@@ -111,6 +113,72 @@ func (i *InlineMenu[User]) AddDataButtonAlert(button, data string, text string, 
 	return i
 }
 
+func (i *InlineMenu[User]) AddLanguageKeyButtonData(button, data string) *InlineMenu[User] {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
+	i.buttonData[button] = data
+
+	i.buttons = append(i.buttons, button)
+
+	i.languageKeyButtons[button] = true
+
+	return i
+}
+
+func (i *InlineMenu[User]) AddLanguageKeyButtonUrl(button, url string) *InlineMenu[User] {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
+	i.buttonUrls[button] = url
+
+	i.buttons = append(i.buttons, button)
+
+	i.languageKeyButtons[button] = true
+
+	return i
+}
+
+func (i *InlineMenu[User]) AddLanguageKeyButtonInlineMenu(
+	button, menu string, edit bool, args ...string) *InlineMenu[User] {
+
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
+	i.buttonInlineMenus[menu] = &buttonInlineMenu{
+		button: button,
+		data:   menu,
+		edit:   edit,
+		args:   args,
+	}
+
+	i.buttons = append(i.buttons, button)
+
+	i.languageKeyButtons[button] = true
+
+	return i
+}
+
+func (i *InlineMenu[User]) AddLanguageKeyDataButtonAlert(
+	button, data string, text string, showAlert bool) *InlineMenu[User] {
+
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
+	i.buttonAlerts[data] = &buttonAlert{
+		data:      data,
+		text:      text,
+		button:    button,
+		showAlert: showAlert,
+	}
+
+	i.buttons = append(i.buttons, button)
+
+	i.languageKeyButtons[button] = true
+
+	return i
+}
+
 func (i *InlineMenu[User]) AddReplyText(text string) *InlineMenu[User] {
 	i.lock.Lock()
 	defer i.lock.Unlock()
@@ -153,29 +221,40 @@ func (i *InlineMenu[User]) SetMaxButtonPerRow(max int) *InlineMenu[User] {
 }
 
 // getInlineKeyboardMarkup returns the inline keyboard markup.
-func (i *InlineMenu[User]) getInlineKeyboardMarkup() *structs.InlineKeyboardMarkup {
+func (i *InlineMenu[User]) getInlineKeyboardMarkup(language *Language) *structs.InlineKeyboardMarkup {
 	var rows [][]map[string]string
 	var row []map[string]string
 
 	for _, button := range i.buttons {
+		buttonText := button
+
+		if language != nil {
+			if i.languageKeyButtons[button] {
+				translatedText, err := language.Get(button)
+				if err == nil {
+					buttonText = translatedText
+				}
+			}
+		}
+
 		if data, ok := i.buttonData[button]; ok {
 			row = append(row, map[string]string{
-				"text":          button,
+				"text":          buttonText,
 				"callback_data": data,
 			})
 		} else if ba := i.getButtonAlertByButton(button); ba != nil {
 			row = append(row, map[string]string{
-				"text":          button,
+				"text":          buttonText,
 				"callback_data": ba.data,
 			})
 		} else if url, ok := i.buttonUrls[button]; ok {
 			row = append(row, map[string]string{
-				"text": button,
+				"text": buttonText,
 				"url":  url,
 			})
 		} else if bim := i.getInlineMenuByButton(button); bim != nil {
 			row = append(row, map[string]string{
-				"text":          button,
+				"text":          buttonText,
 				"callback_data": bim.data,
 			})
 		}

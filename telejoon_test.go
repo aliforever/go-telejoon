@@ -84,7 +84,7 @@ func TestStart(t *testing.T) {
 								update.Set("name", "Ali")
 								return "", true
 							}).
-							AddButtonState("Change Language", "ChangeLanguage").
+							AddLanguageKeyButtonState("Welcome.ChangeLanguageBtn", "ChangeLanguage").
 							ReplyWithLanguageKey("Welcome.Main").
 							AddButtonText("Hello", "You said Hello").
 							AddButtonInlineMenu("Inline", "Info").
@@ -111,6 +111,7 @@ func TestStart(t *testing.T) {
 							})).
 					AddInlineMenu("Info", telejoon.NewInlineMenu[ExampleUser]().
 						AddButtonUrl("Google", "https://google.com").
+						AddLanguageKeyDataButtonAlert("Info.Hello", "say_hello_0", "Hello Friend", false).
 						AddDataButtonAlert("Hello", "say_hello", "Hello Friend", false).
 						AddDataButtonAlert("Hello 2", "say_hello_2", "Hello Friend 2", false).
 						AddDataButtonAlert("Hello 3", "say_hello_3", "Hello Friend 3", true).
