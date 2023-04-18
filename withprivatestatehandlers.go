@@ -391,14 +391,10 @@ func (e *EngineWithPrivateStateHandlers[User]) switchState(
 			return fmt.Errorf("error_setting_user_state: %d, %w", from.Id, err)
 		}
 
-		e.processStaticHandler(handler, client, &StateUpdate[User]{
-			context:    stateUpdate.context,
-			State:      nextState,
-			language:   stateUpdate.language,
-			User:       stateUpdate.User,
-			Update:     stateUpdate.Update,
-			IsSwitched: true,
-		})
+		stateUpdate.State = nextState
+		stateUpdate.IsSwitched = true
+
+		e.processStaticHandler(handler, client, stateUpdate)
 
 		return nil
 	}
