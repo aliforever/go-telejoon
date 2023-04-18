@@ -3,7 +3,6 @@ package telejoon
 import (
 	"context"
 	tgbotapi "github.com/aliforever/go-telegram-bot-api"
-	"sync"
 )
 
 type StateUpdate[User any] struct {
@@ -17,13 +16,12 @@ type StateUpdate[User any] struct {
 
 // Set sets a value for the context.
 func (s *StateUpdate[User]) Set(key, value interface{}) {
-	s.context.Value("storage").(*sync.Map).Store(key, value)
+	s.context = context.WithValue(s.context, key, value)
 }
 
 // Get gets a value from the context.
 func (s *StateUpdate[User]) Get(key interface{}) interface{} {
-	val, _ := s.context.Value("storage").(*sync.Map).Load(key)
-	return val
+	return s.context.Value(key)
 }
 
 // SetLanguage sets the language for the user.

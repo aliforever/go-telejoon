@@ -138,7 +138,7 @@ func (e *EngineWithPrivateStateHandlers[User]) process(client *tgbotapi.Telegram
 	}
 
 	su := &StateUpdate[User]{
-		context:    context.WithValue(context.Background(), "storage", &sync.Map{}),
+		context:    context.Background(),
 		State:      userState,
 		User:       user,
 		Update:     update,
@@ -238,14 +238,11 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 					return
 				}
 
-				e.processStaticHandler(e.staticMenus[nextState], client, &StateUpdate[User]{
-					context:    update.context,
-					State:      nextState,
-					User:       update.User,
-					Update:     update.Update,
-					language:   update.language,
-					IsSwitched: true,
-				})
+				err := e.switchState(nextState, client, update)
+				if err != nil {
+					e.onErr(client, update.Update, err)
+					return
+				}
 			}
 
 			return
