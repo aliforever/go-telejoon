@@ -1,13 +1,13 @@
 package telejoon
 
 type (
-	actionKind string
+	ActionKind string
 )
 
 const (
-	actionKindText       actionKind = "TEXT"
-	actionKindInlineMenu actionKind = "INLINE_MENU"
-	actionKindState      actionKind = "STATE"
+	ActionKindText       ActionKind = "TEXT"
+	ActionKindInlineMenu ActionKind = "INLINE_MENU"
+	ActionKindState      ActionKind = "STATE"
 )
 
 type baseCommand struct {
@@ -20,8 +20,8 @@ type textCommand struct {
 	text string
 }
 
-func (t textCommand) Kind() actionKind {
-	return actionKindText
+func (t textCommand) Kind() ActionKind {
+	return ActionKindText
 }
 
 func (t textCommand) Result() string {
@@ -36,8 +36,8 @@ type inlineMenuCommand struct {
 	inlineMenu string
 }
 
-func (t inlineMenuCommand) Kind() actionKind {
-	return actionKindInlineMenu
+func (t inlineMenuCommand) Kind() ActionKind {
+	return ActionKindInlineMenu
 }
 
 func (t inlineMenuCommand) Result() string {
@@ -52,8 +52,8 @@ type stateCommand struct {
 	state string
 }
 
-func (t stateCommand) Kind() actionKind {
-	return actionKindState
+func (t stateCommand) Kind() ActionKind {
+	return ActionKindState
 }
 
 func (t stateCommand) Result() string {
@@ -73,8 +73,8 @@ type textButton struct {
 	text string
 }
 
-func (t textButton) Kind() actionKind {
-	return actionKindText
+func (t textButton) Kind() ActionKind {
+	return ActionKindText
 }
 
 func (t textButton) Result() string {
@@ -89,8 +89,8 @@ type inlineMenuButton struct {
 	inlineMenu string
 }
 
-func (t inlineMenuButton) Kind() actionKind {
-	return actionKindInlineMenu
+func (t inlineMenuButton) Kind() ActionKind {
+	return ActionKindInlineMenu
 }
 
 func (t inlineMenuButton) Result() string {
@@ -105,8 +105,8 @@ type stateButton struct {
 	state string
 }
 
-func (t stateButton) Kind() actionKind {
-	return actionKindState
+func (t stateButton) Kind() ActionKind {
+	return ActionKindState
 }
 
 func (t stateButton) Result() string {
@@ -115,14 +115,14 @@ func (t stateButton) Result() string {
 
 // --------------------------------------------
 
-type action interface {
-	Kind() actionKind
+type Action interface {
+	Kind() ActionKind
 	Result() string
 }
 
 type staticActionBuilder struct {
-	buttons  []action
-	commands []action
+	buttons  []Action
+	commands []Action
 }
 
 // NewActionBuilder creates a new staticActionBuilder.
@@ -205,19 +205,19 @@ func (b *staticActionBuilder) AddStateCommand(command, state string) *staticActi
 }
 
 // AddCustomButton adds a custom action of button type to the staticActionBuilder.
-func (b *staticActionBuilder) AddCustomButton(action action) *staticActionBuilder {
+func (b *staticActionBuilder) AddCustomButton(action Action) *staticActionBuilder {
 	b.buttons = append(b.buttons, action)
 	return b
 }
 
 // AddCustomCommand adds a custom action of command type to the staticActionBuilder.
-func (b *staticActionBuilder) AddCustomCommand(action action) *staticActionBuilder {
+func (b *staticActionBuilder) AddCustomCommand(action Action) *staticActionBuilder {
 	b.commands = append(b.commands, action)
 	return b
 }
 
 // getButtonByButton returns the action by the button.
-func (b *staticActionBuilder) getButtonByButton(button string) action {
+func (b *staticActionBuilder) getButtonByButton(button string) Action {
 	for _, btn := range b.buttons {
 		if btn.Result() == button {
 			return btn

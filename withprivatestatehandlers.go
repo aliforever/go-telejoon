@@ -270,16 +270,16 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 					var err error
 
 					switch buttonAction.Kind() {
-					case actionKindText:
+					case ActionKindText:
 						_, err = client.Send(client.Message().SetText(buttonAction.Result()).SetChatId(from.Id))
 						if err != nil {
 							err = fmt.Errorf("error_sending_message_to_user: %d, %w", from.Id, err)
 						}
-					case actionKindState:
+					case ActionKindState:
 						if err := e.switchState(buttonAction.Result(), client, update); err != nil {
 							err = fmt.Errorf("error_switching_state: %d, %w", from.Id, err)
 						}
-					case actionKindInlineMenu:
+					case ActionKindInlineMenu:
 						err = e.processInlineHandler(buttonAction.Result(), client, update, false)
 						if err != nil {
 							err = fmt.Errorf("error_switching_inline_menu: %d, %w", from.Id, err)
