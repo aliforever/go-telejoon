@@ -1,21 +1,21 @@
 package telejoon
 
 type ButtonOptions struct {
-	translateTitle bool
-	translateText  bool
+	translateName bool
+	translateText bool
 }
 
 // NewButtonOptions creates a new ButtonOptions.
 func NewButtonOptions() *ButtonOptions {
 	return &ButtonOptions{
-		translateTitle: true,
-		translateText:  true,
+		translateName: true,
+		translateText: true,
 	}
 }
 
-// TranslateTitle sets whether to translate the title of the action.
-func (b *ButtonOptions) TranslateTitle() *ButtonOptions {
-	b.translateTitle = true
+// TranslateName sets whether to translate the title of the action.
+func (b *ButtonOptions) TranslateName() *ButtonOptions {
+	b.translateName = true
 	return b
 }
 
@@ -25,9 +25,9 @@ func (b *ButtonOptions) TranslateText() *ButtonOptions {
 	return b
 }
 
-// DoNotTranslateTitle sets whether to translate the title of the action.
-func (b *ButtonOptions) DoNotTranslateTitle() *ButtonOptions {
-	b.translateTitle = false
+// DoNotTranslateName sets whether to translate the title of the action.
+func (b *ButtonOptions) DoNotTranslateName() *ButtonOptions {
+	b.translateName = false
 	return b
 }
 

@@ -1,5 +1,12 @@
 package telejoon
 
+import (
+	tgbotapi "github.com/aliforever/go-telegram-bot-api"
+	"github.com/aliforever/go-telegram-bot-api/structs"
+	"github.com/aliforever/go-telegram-bot-api/tools"
+	"sync"
+)
+
 type (
 	ActionKind string
 )
@@ -20,6 +27,10 @@ type textCommand struct {
 	text string
 }
 
+func (t textCommand) Name() string {
+	return t.command
+}
+
 func (t textCommand) Kind() ActionKind {
 	return ActionKindText
 }
@@ -34,6 +45,10 @@ func (t textCommand) Result() string {
 type inlineMenuCommand struct {
 	baseCommand
 	inlineMenu string
+}
+
+func (t inlineMenuCommand) Name() string {
+	return t.command
 }
 
 func (t inlineMenuCommand) Kind() ActionKind {
@@ -52,6 +67,10 @@ type stateCommand struct {
 	state string
 }
 
+func (t stateCommand) Name() string {
+	return t.command
+}
+
 func (t stateCommand) Kind() ActionKind {
 	return ActionKindState
 }
@@ -64,13 +83,17 @@ func (t stateCommand) Result() string {
 
 type baseButton struct {
 	button  string
-	options []ButtonOptions
+	options []*ButtonOptions
 }
 
 // textButton is a action that sends a text message.
 type textButton struct {
 	baseButton
 	text string
+}
+
+func (t textButton) Name() string {
+	return t.button
 }
 
 func (t textButton) Kind() ActionKind {
@@ -89,6 +112,10 @@ type inlineMenuButton struct {
 	inlineMenu string
 }
 
+func (t inlineMenuButton) Name() string {
+	return t.button
+}
+
 func (t inlineMenuButton) Kind() ActionKind {
 	return ActionKindInlineMenu
 }
@@ -105,6 +132,10 @@ type stateButton struct {
 	state string
 }
 
+func (t stateButton) Name() string {
+	return t.button
+}
+
 func (t stateButton) Kind() ActionKind {
 	return ActionKindState
 }
@@ -116,22 +147,32 @@ func (t stateButton) Result() string {
 // --------------------------------------------
 
 type Action interface {
+	Name() string
 	Kind() ActionKind
 	Result() string
 }
 
 type staticActionBuilder struct {
+	locker sync.Mutex
+
 	buttons  []Action
 	commands []Action
+
+	buttonOptions map[string][]*ButtonOptions
 }
 
 // NewActionBuilder creates a new staticActionBuilder.
 func NewActionBuilder() *staticActionBuilder {
-	return &staticActionBuilder{}
+	return &staticActionBuilder{
+		buttonOptions: make(map[string][]*ButtonOptions),
+	}
 }
 
 // AddTextButton adds a text action to the staticActionBuilder.
-func (b *staticActionBuilder) AddTextButton(button, text string, opts ...ButtonOptions) *staticActionBuilder {
+func (b *staticActionBuilder) AddTextButton(button, text string, opts ...*ButtonOptions) *staticActionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
 	b.buttons = append(b.buttons, textButton{
 		baseButton: baseButton{
 			button:  button,
@@ -140,11 +181,39 @@ func (b *staticActionBuilder) AddTextButton(button, text string, opts ...ButtonO
 		text: text,
 	})
 
+	if len(opts) > 0 {
+		b.buttonOptions[button] = opts
+	}
+
+	return b
+}
+
+// AddTextButtonT adds a text action to the staticActionBuilder with name translation.
+func (b *staticActionBuilder) AddTextButtonT(button, text string, opts ...*ButtonOptions) *staticActionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	b.buttons = append(b.buttons, textButton{
+		baseButton: baseButton{
+			button:  button,
+			options: opts,
+		},
+		text: text,
+	})
+
+	b.buttonOptions[button] = []*ButtonOptions{
+		NewButtonOptions().TranslateName(),
+	}
+
 	return b
 }
 
 // AddInlineMenuButton adds an inline menu action to the staticActionBuilder.
-func (b *staticActionBuilder) AddInlineMenuButton(button, inlineMenu string, opts ...ButtonOptions) *staticActionBuilder {
+func (b *staticActionBuilder) AddInlineMenuButton(
+	button, inlineMenu string, opts ...*ButtonOptions) *staticActionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
 	b.buttons = append(b.buttons, inlineMenuButton{
 		baseButton: baseButton{
 			button:  button,
@@ -153,11 +222,37 @@ func (b *staticActionBuilder) AddInlineMenuButton(button, inlineMenu string, opt
 		inlineMenu: inlineMenu,
 	})
 
+	if len(opts) > 0 {
+		b.buttonOptions[button] = opts
+	}
+
+	return b
+}
+
+// AddInlineMenuButtonT adds an inline menu action to the staticActionBuilder with name translation.
+func (b *staticActionBuilder) AddInlineMenuButtonT(button, inlineMenu string) *staticActionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	b.buttons = append(b.buttons, inlineMenuButton{
+		baseButton: baseButton{
+			button: button,
+		},
+		inlineMenu: inlineMenu,
+	})
+
+	b.buttonOptions[button] = []*ButtonOptions{
+		NewButtonOptions().TranslateName(),
+	}
+
 	return b
 }
 
 // AddStateButton adds a state action to the staticActionBuilder.
-func (b *staticActionBuilder) AddStateButton(button, state string, opts ...ButtonOptions) *staticActionBuilder {
+func (b *staticActionBuilder) AddStateButton(button, state string, opts ...*ButtonOptions) *staticActionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
 	b.buttons = append(b.buttons, stateButton{
 		baseButton: baseButton{
 			button:  button,
@@ -165,11 +260,36 @@ func (b *staticActionBuilder) AddStateButton(button, state string, opts ...Butto
 		}, state: state,
 	})
 
+	if len(opts) > 0 {
+		b.buttonOptions[button] = opts
+	}
+
+	return b
+}
+
+// AddStateButtonT adds a state action to the staticActionBuilder with name translation.
+func (b *staticActionBuilder) AddStateButtonT(button, state string) *staticActionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	b.buttons = append(b.buttons, stateButton{
+		baseButton: baseButton{
+			button: button,
+		}, state: state,
+	})
+
+	b.buttonOptions[button] = []*ButtonOptions{
+		NewButtonOptions().TranslateName(),
+	}
+
 	return b
 }
 
 // AddTextCommand adds a text command to the staticActionBuilder.
 func (b *staticActionBuilder) AddTextCommand(command, text string) *staticActionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
 	b.commands = append(b.commands, textCommand{
 		baseCommand: baseCommand{
 			command: command,
@@ -182,6 +302,9 @@ func (b *staticActionBuilder) AddTextCommand(command, text string) *staticAction
 
 // AddInlineMenuCommand adds an inline menu command to the staticActionBuilder.
 func (b *staticActionBuilder) AddInlineMenuCommand(command, inlineMenu string) *staticActionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
 	b.commands = append(b.commands, inlineMenuCommand{
 		baseCommand: baseCommand{
 			command: command,
@@ -194,6 +317,9 @@ func (b *staticActionBuilder) AddInlineMenuCommand(command, inlineMenu string) *
 
 // AddStateCommand adds a state command to the staticActionBuilder.
 func (b *staticActionBuilder) AddStateCommand(command, state string) *staticActionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
 	b.commands = append(b.commands, stateCommand{
 		baseCommand: baseCommand{
 			command: command,
@@ -206,23 +332,127 @@ func (b *staticActionBuilder) AddStateCommand(command, state string) *staticActi
 
 // AddCustomButton adds a custom action of button type to the staticActionBuilder.
 func (b *staticActionBuilder) AddCustomButton(action Action) *staticActionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
 	b.buttons = append(b.buttons, action)
+
 	return b
 }
 
 // AddCustomCommand adds a custom action of command type to the staticActionBuilder.
 func (b *staticActionBuilder) AddCustomCommand(action Action) *staticActionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
 	b.commands = append(b.commands, action)
+
 	return b
 }
 
 // getButtonByButton returns the action by the button.
 func (b *staticActionBuilder) getButtonByButton(button string) Action {
 	for _, btn := range b.buttons {
-		if btn.Result() == button {
+		if btn.Name() == button {
 			return btn
 		}
 	}
 
 	return nil
+}
+
+// buildButtons builds the buttons.
+func (b *staticActionBuilder) buildButtons(language *Language) *structs.ReplyKeyboardMarkup {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	if len(b.buttons) == 0 {
+		return nil
+	}
+
+	var newButtons = make([]string, len(b.buttons))
+
+	for i, button := range b.buttons {
+		newButtons[i] = button.Name()
+	}
+
+	if language != nil {
+		for i, button := range b.buttons {
+			if opts := b.buttonOptions[button.Name()]; len(opts) > 0 {
+				if opts[0].translateName {
+					btnText, err := language.Get(button.Name())
+					if err == nil {
+						newButtons[i] = btnText
+					}
+				}
+			}
+		}
+	}
+
+	return tools.Keyboards{}.NewReplyKeyboardFromSliceOfStrings(newButtons, 2)
+}
+
+func (b *staticActionBuilder) languageValueButtonKeys(language *Language) map[string]string {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	var valueKeys = make(map[string]string)
+
+	for k, v := range b.buttonOptions {
+		if len(v) > 0 && v[0].translateName {
+			keyValue, err := language.Get(k)
+			if err != nil {
+				valueKeys[k] = k
+			} else {
+				valueKeys[keyValue] = k
+			}
+		}
+	}
+
+	return valueKeys
+}
+
+// chooseLanguageButton implements the Action interface.
+type chooseLanguageButton[User any] struct {
+	button         string
+	engine         *EngineWithPrivateStateHandlers[User]
+	client         *tgbotapi.TelegramBot
+	update         *StateUpdate[User]
+	languageConfig *LanguageConfig
+	localizer      *Language
+}
+
+// NewChooseLanguageButton creates a new chooseLanguageButton.
+func NewChooseLanguageButton[User any](
+	button string, engine *EngineWithPrivateStateHandlers[User], update *StateUpdate[User], lang *LanguageConfig,
+	localizer *Language, client *tgbotapi.TelegramBot) Action {
+
+	return chooseLanguageButton[User]{
+		button:         button,
+		engine:         engine,
+		languageConfig: lang,
+		client:         client,
+		update:         update,
+		localizer:      localizer,
+	}
+}
+
+func (c chooseLanguageButton[User]) Name() string {
+	return c.button
+}
+
+func (c chooseLanguageButton[User]) Kind() ActionKind {
+	return ActionKindState
+}
+
+func (c chooseLanguageButton[User]) Result() string {
+	err := c.languageConfig.repo.SetUserLanguage(c.update.Update.From().Id, c.localizer.tag)
+	if err != nil {
+		c.engine.onErr(c.client, c.update.Update, err)
+		return ""
+	}
+
+	c.update.SetLanguage(c.localizer)
+
+	return c.engine.defaultStateName
 }

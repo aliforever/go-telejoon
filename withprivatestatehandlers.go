@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	tgbotapi "github.com/aliforever/go-telegram-bot-api"
+	"github.com/aliforever/go-telegram-bot-api/structs"
 	"strings"
 	"sync"
 )
@@ -87,28 +88,24 @@ func (e *EngineWithPrivateStateHandlers[User]) WithLanguageConfig(
 
 	menu := NewStaticMenu[User]()
 
-	for i := range cfg.languages.localizers {
-		lang := cfg.languages.localizers[i]
+	menu.AddMiddleware(func(bot *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool) {
+		actions := NewActionBuilder()
 
-		btnText, _ := lang.Get(fmt.Sprintf("%s.Button", cfg.changeLanguageState))
-		if btnText == "" {
-			btnText = lang.tag
+		for i := range cfg.languages.localizers {
+			lang := cfg.languages.localizers[i]
+
+			btnText, _ := lang.Get(fmt.Sprintf("%s.Button", cfg.changeLanguageState))
+			if btnText == "" {
+				btnText = lang.tag
+			}
+
+			actions.AddCustomButton(NewChooseLanguageButton[User](btnText, e, update, cfg, &lang, bot))
 		}
 
-		// menu.AddButtonFunc(btnText,
-		// 	func(bot *tgbotapi.TelegramBot, update *StateUpdate[User]) string {
-		// 		err := cfg.repo.SetUserLanguage(update.Update.From().Id, lang.tag)
-		// 		if err != nil {
-		// 			e.onErr(bot, update.Update, err)
-		// 			return ""
-		// 		}
-		//
-		// 		// TODO: maybe access to update should be protected and through getters, only a setter to change language
-		// 		update.Language = &lang
-		//
-		// 		return e.defaultStateName
-		// 	})
-	}
+		menu.WithStaticActionBuilder(actions)
+
+		return "", true
+	})
 
 	text := ""
 	for _, lang := range cfg.languages.localizers {
@@ -171,7 +168,7 @@ func (e *EngineWithPrivateStateHandlers[User]) process(client *tgbotapi.Telegram
 		lang = e.languageConfig.languages.getByTag(userLanguage)
 	}
 
-	su.Language = lang
+	su.language = lang
 
 	for _, f := range e.middlewares {
 		if nextState, ok := f(client, su); !ok {
@@ -257,8 +254,8 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 		if !update.IsSwitched {
 			buttonText := update.Update.Message.Text
 
-			if update.Language != nil {
-				if languageValueKeys := handler.languageValueButtonKeys(update.Language); languageValueKeys != nil {
+			if update.language != nil && handler.staticActionBuilder != nil {
+				if languageValueKeys := handler.staticActionBuilder.languageValueButtonKeys(update.language); languageValueKeys != nil {
 					if languageValueKey := languageValueKeys[buttonText]; languageValueKey != "" {
 						buttonText = languageValueKey
 					}
@@ -271,16 +268,19 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 
 					switch buttonAction.Kind() {
 					case ActionKindText:
-						_, err = client.Send(client.Message().SetText(buttonAction.Result()).SetChatId(from.Id))
+						text := buttonAction.Result()
+						_, err = client.Send(client.Message().SetText(text).SetChatId(from.Id))
 						if err != nil {
 							err = fmt.Errorf("error_sending_message_to_user: %d, %w", from.Id, err)
 						}
 					case ActionKindState:
-						if err := e.switchState(buttonAction.Result(), client, update); err != nil {
+						nextState := buttonAction.Result()
+						if err := e.switchState(nextState, client, update); err != nil {
 							err = fmt.Errorf("error_switching_state: %d, %w", from.Id, err)
 						}
 					case ActionKindInlineMenu:
-						err = e.processInlineHandler(buttonAction.Result(), client, update, false)
+						inlineMenu := buttonAction.Result()
+						err = e.processInlineHandler(inlineMenu, client, update, false)
 						if err != nil {
 							err = fmt.Errorf("error_switching_inline_menu: %d, %w", from.Id, err)
 						}
@@ -292,12 +292,18 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 						e.onErr(client, update.Update, err)
 						return
 					}
+
+					return
 				}
 			}
 		}
 	}
 
-	replyMarkup := handler.buildButtonKeyboard(update.Language)
+	var replyMarkup *structs.ReplyKeyboardMarkup
+
+	if handler.staticActionBuilder != nil {
+		replyMarkup = handler.staticActionBuilder.buildButtons(update.language)
+	}
 
 	if replyText := handler.getReplyText(); replyText != "" {
 		cfg := client.Message().SetText(replyText).SetChatId(from.Id)
@@ -314,10 +320,10 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 
 	if replyLanguageKey := handler.getReplyTextLanguageKey(); replyLanguageKey != "" {
 		var txt string
-		if update.Language == nil {
+		if update.language == nil {
 			txt = replyLanguageKey
 		} else {
-			result, err := update.Language.Get(replyLanguageKey)
+			result, err := update.language.Get(replyLanguageKey)
 			if err == nil {
 				txt = result
 			}
@@ -350,7 +356,7 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineHandler(
 
 	from := update.Update.From()
 
-	markup := menu.getInlineKeyboardMarkup(update.Language)
+	markup := menu.getInlineKeyboardMarkup(update.language)
 
 	if menu.replyText != "" {
 		var cfg tgbotapi.Config
@@ -382,14 +388,16 @@ func (e *EngineWithPrivateStateHandlers[User]) switchState(
 		if err := e.userRepository.SetState(from.Id, nextState); err != nil {
 			return fmt.Errorf("error_setting_user_state: %d, %w", from.Id, err)
 		}
+
 		e.processStaticHandler(handler, client, &StateUpdate[User]{
 			context:    stateUpdate.context,
 			State:      nextState,
-			Language:   stateUpdate.Language,
+			language:   stateUpdate.language,
 			User:       stateUpdate.User,
 			Update:     stateUpdate.Update,
 			IsSwitched: true,
 		})
+
 		return nil
 	}
 

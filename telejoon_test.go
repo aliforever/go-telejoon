@@ -84,9 +84,11 @@ func TestStart(t *testing.T) {
 								return "", true
 							}).
 							WithStaticActionBuilder(telejoon.NewActionBuilder().
+								AddStateButtonT("Welcome.ChangeLanguageBtn", "ChangeLanguage").
 								AddTextButton("Hello", "You said Hello").
-								AddStateButton("Info", "Info")),
-					).
+								AddStateButton("Info State", "Info").
+								AddInlineMenuButton("Info", "Info")).
+							ReplyWithLanguageKey("Welcome.Main")).
 					// AddStaticMenu("Info",
 					// 	telejoon.NewStaticMenu[ExampleUser]().
 					// 		AddButtonState("Back", "Welcome").
@@ -96,6 +98,10 @@ func TestStart(t *testing.T) {
 					// 				SetText("replied with func").
 					// 				SetChatId(update.User.Id))
 					// 		})).
+					AddStaticMenu("Info", telejoon.NewStaticMenu[ExampleUser]().
+						WithStaticActionBuilder(telejoon.NewActionBuilder().
+							AddStateButtonT("Global.Back", "Welcome")).
+						ReplyWithLanguageKey("Info.Hello")).
 					AddInlineMenu("Info", telejoon.NewInlineMenu[ExampleUser]().
 						AddButtonUrl("Google", "https://google.com").
 						AddLanguageKeyDataButtonAlert("Info.Hello", "say_hello_0", "Hello Friend", false).

@@ -2,8 +2,6 @@ package telejoon
 
 import (
 	tgbotapi "github.com/aliforever/go-telegram-bot-api"
-	"github.com/aliforever/go-telegram-bot-api/structs"
-	"github.com/aliforever/go-telegram-bot-api/tools"
 	"sync"
 )
 
@@ -86,34 +84,6 @@ func (s *StaticMenu[User]) ReplyWithFunc(
 	return s
 }
 
-func (s *StaticMenu[User]) buildButtonKeyboard(language *Language) *structs.ReplyKeyboardMarkup {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if len(s.buttons) == 0 {
-		return nil
-	}
-
-	var newButtons = make([]string, len(s.buttons))
-
-	for i, button := range s.buttons {
-		newButtons[i] = button
-	}
-
-	if language != nil {
-		for i, button := range newButtons {
-			if s.languageKeyButtons[button] {
-				btnText, err := language.Get(button)
-				if err == nil {
-					newButtons[i] = btnText
-				}
-			}
-		}
-	}
-
-	return tools.Keyboards{}.NewReplyKeyboardFromSliceOfStrings(newButtons, 2)
-}
-
 func (s *StaticMenu[User]) getReplyText() string {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -133,29 +103,4 @@ func (s *StaticMenu[User]) getReplyWithFunc() func(*tgbotapi.TelegramBot, *State
 	defer s.lock.Unlock()
 
 	return s.replyWithFunc
-}
-
-func (s *StaticMenu[User]) getFuncForButton(btn string) func(*tgbotapi.TelegramBot, *StateUpdate[User]) string {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.buttonFuncs[btn]
-}
-
-func (s *StaticMenu[User]) languageValueButtonKeys(language *Language) map[string]string {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	var valueKeys = make(map[string]string)
-
-	for k := range s.languageKeyButtons {
-		keyValue, err := language.Get(k)
-		if err != nil {
-			valueKeys[k] = k
-		} else {
-			valueKeys[keyValue] = k
-		}
-	}
-
-	return valueKeys
 }
