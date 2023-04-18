@@ -2,7 +2,6 @@ package telejoon_test
 
 import (
 	"context"
-	"fmt"
 	tgbotapi "github.com/aliforever/go-telegram-bot-api"
 	"github.com/aliforever/go-telegram-bot-api/structs"
 	"github.com/aliforever/go-telejoon"
@@ -84,31 +83,19 @@ func TestStart(t *testing.T) {
 								update.Set("name", "Ali")
 								return "", true
 							}).
-							AddLanguageKeyButtonState("Welcome.ChangeLanguageBtn", "ChangeLanguage").
-							ReplyWithLanguageKey("Welcome.Main").
-							AddButtonText("Hello", "You said Hello").
-							AddButtonInlineMenu("Inline", "Info").
-							AddButtonText("Bye", "You said Bye").
-							AddButtonState("Show Info", "Info").
-							AddButtonFunc("Dynamic Info",
-								func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) string {
-									client.Send(client.Message().
-										SetChatId(update.User.Id).
-										SetText(fmt.Sprintf("Hello %s\nContex Value: %s\nId: %d",
-											update.Get("name").(string), update.Get("test").(string),
-											update.User.Id)))
-									return ""
-								}),
+							WithStaticActionBuilder(telejoon.NewActionBuilder().
+								AddTextButton("Hello", "You said Hello").
+								AddStateButton("Info", "Info")),
 					).
-					AddStaticMenu("Info",
-						telejoon.NewStaticMenu[ExampleUser]().
-							AddButtonState("Back", "Welcome").
-							ReplyWithText("This is Info Menu!").
-							ReplyWithFunc(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) {
-								client.Send(client.Message().
-									SetText("replied with func").
-									SetChatId(update.User.Id))
-							})).
+					// AddStaticMenu("Info",
+					// 	telejoon.NewStaticMenu[ExampleUser]().
+					// 		AddButtonState("Back", "Welcome").
+					// 		ReplyWithText("This is Info Menu!").
+					// 		ReplyWithFunc(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) {
+					// 			client.Send(client.Message().
+					// 				SetText("replied with func").
+					// 				SetChatId(update.User.Id))
+					// 		})).
 					AddInlineMenu("Info", telejoon.NewInlineMenu[ExampleUser]().
 						AddButtonUrl("Google", "https://google.com").
 						AddLanguageKeyDataButtonAlert("Info.Hello", "say_hello_0", "Hello Friend", false).

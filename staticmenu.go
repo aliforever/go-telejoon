@@ -16,11 +16,10 @@ type StaticMenu[User any] struct {
 
 	replyWithFunc func(*tgbotapi.TelegramBot, *StateUpdate[User])
 
-	buttonInlineMenus  map[string]string
-	buttonTexts        map[string]string
-	buttonStates       map[string]string
 	buttonFuncs        map[string]func(*tgbotapi.TelegramBot, *StateUpdate[User]) string
 	languageKeyButtons map[string]bool
+
+	staticActionBuilder *staticActionBuilder
 
 	middlewares []func(*tgbotapi.TelegramBot, *StateUpdate[User]) (string, bool)
 
@@ -32,10 +31,7 @@ type StaticMenu[User any] struct {
 // NewStaticMenu creates a new raw StaticMenu[User UserI[User]].
 func NewStaticMenu[User any]() *StaticMenu[User] {
 	return &StaticMenu[User]{
-		buttonInlineMenus:  make(map[string]string),
-		buttonStates:       make(map[string]string),
 		buttonFuncs:        make(map[string]func(*tgbotapi.TelegramBot, *StateUpdate[User]) string),
-		buttonTexts:        make(map[string]string),
 		languageKeyButtons: make(map[string]bool),
 	}
 }
@@ -52,152 +48,14 @@ func (s *StaticMenu[User]) AddMiddleware(
 	return s
 }
 
-// AddButtonInlineMenu adds a new reply button inline menu to the handler.
-func (s *StaticMenu[User]) AddButtonInlineMenu(button, menu string) *StaticMenu[User] {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.buttonInlineMenus[button] = menu
-
-	s.buttons = append(s.buttons, button)
-
-	return s
-}
-
-// AddCommandInlineMenu adds a new reply button inline menu to the handler.
-func (s *StaticMenu[User]) AddCommandInlineMenu(button, menu string) *StaticMenu[User] {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.buttonInlineMenus[button] = menu
-
-	return s
-}
-
-// AddButtonText adds a new reply button text to the handler.
-func (s *StaticMenu[User]) AddButtonText(button, text string) *StaticMenu[User] {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.buttonTexts[button] = text
-
-	s.buttons = append(s.buttons, button)
-
-	return s
-}
-
-// AddButtonState adds a new reply button state to the handler.
-func (s *StaticMenu[User]) AddButtonState(button, state string) *StaticMenu[User] {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.buttonStates[button] = state
-
-	s.buttons = append(s.buttons, button)
-
-	return s
-}
-
-// AddButtonFunc adds a new reply button func to the handler.
-func (s *StaticMenu[User]) AddButtonFunc(
-	button string, f func(*tgbotapi.TelegramBot, *StateUpdate[User]) string) *StaticMenu[User] {
+// WithStaticActionBuilder sets the static action builder for the handler.
+func (s *StaticMenu[User]) WithStaticActionBuilder(
+	builder *staticActionBuilder) *StaticMenu[User] {
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.buttonFuncs[button] = f
-
-	s.buttons = append(s.buttons, button)
-
-	return s
-}
-
-// AddLanguageKeyButtonInlineMenu adds a new reply button inline menu to the handler.
-func (s *StaticMenu[User]) AddLanguageKeyButtonInlineMenu(button, menu string) *StaticMenu[User] {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.buttonInlineMenus[button] = menu
-
-	s.buttons = append(s.buttons, button)
-
-	s.languageKeyButtons[button] = true
-
-	return s
-}
-
-// AddLanguageKeyButtonText adds a new reply button text to the handler.
-func (s *StaticMenu[User]) AddLanguageKeyButtonText(button, text string) *StaticMenu[User] {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.buttonTexts[button] = text
-
-	s.buttons = append(s.buttons, button)
-
-	s.languageKeyButtons[button] = true
-
-	return s
-}
-
-// AddLanguageKeyButtonState adds a new reply button state to the handler.
-func (s *StaticMenu[User]) AddLanguageKeyButtonState(button, state string) *StaticMenu[User] {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.buttonStates[button] = state
-
-	s.buttons = append(s.buttons, button)
-
-	s.languageKeyButtons[button] = true
-
-	return s
-}
-
-// AddLanguageKeyButtonFunc adds a new reply button func to the handler.
-func (s *StaticMenu[User]) AddLanguageKeyButtonFunc(
-	button string, f func(*tgbotapi.TelegramBot, *StateUpdate[User]) string) *StaticMenu[User] {
-
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.buttonFuncs[button] = f
-
-	s.buttons = append(s.buttons, button)
-
-	s.languageKeyButtons[button] = true
-
-	return s
-}
-
-// AddCommandText adds a new reply button text to the handler.
-func (s *StaticMenu[User]) AddCommandText(button, text string) *StaticMenu[User] {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.buttonTexts[button] = text
-
-	return s
-}
-
-// AddCommandState adds a new reply button state to the handler.
-func (s *StaticMenu[User]) AddCommandState(button, state string) *StaticMenu[User] {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.buttonStates[button] = state
-
-	return s
-}
-
-// AddCommandFunc adds a new reply button func to the handler.
-func (s *StaticMenu[User]) AddCommandFunc(
-	button string, f func(*tgbotapi.TelegramBot, *StateUpdate[User]) string) *StaticMenu[User] {
-
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.buttonFuncs[button] = f
+	s.staticActionBuilder = builder
 
 	return s
 }
@@ -256,20 +114,6 @@ func (s *StaticMenu[User]) buildButtonKeyboard(language *Language) *structs.Repl
 	return tools.Keyboards{}.NewReplyKeyboardFromSliceOfStrings(newButtons, 2)
 }
 
-func (s *StaticMenu[User]) getReplyTextForButton(button string) string {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.buttonTexts[button]
-}
-
-func (s *StaticMenu[User]) getStateForButton(button string) string {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.buttonStates[button]
-}
-
 func (s *StaticMenu[User]) getReplyText() string {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -296,13 +140,6 @@ func (s *StaticMenu[User]) getFuncForButton(btn string) func(*tgbotapi.TelegramB
 	defer s.lock.Unlock()
 
 	return s.buttonFuncs[btn]
-}
-
-func (s *StaticMenu[User]) getInlineMenuForButton(btn string) string {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.buttonInlineMenus[btn]
 }
 
 func (s *StaticMenu[User]) languageValueButtonKeys(language *Language) map[string]string {

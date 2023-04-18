@@ -11,6 +11,26 @@ type engine[User any, Channel any, Group any, Language any] struct {
 	opts []*Options
 }
 
+// sendConfigWithErrHandler is a helper function to send a message with a config and handle errors.
+func (t *engine[User, Channel, Group, Language]) sendConfigWithErrHandler(
+	client *tgbotapi.TelegramBot, config tgbotapi.Config, update tgbotapi.Update) (*tgbotapi.Response, error) {
+
+	if len(t.opts) > 0 {
+		if t.opts[0].Logger != nil {
+			j, _ := json.Marshal(config)
+			t.opts[0].Logger.Infof("Sending message: %s", string(j))
+		}
+	}
+
+	_, err := client.Send(config)
+	if err != nil {
+		t.onErr(client, update, err)
+		return nil, err
+	}
+
+	return nil, err
+}
+
 func (t *engine[User, Channel, Group, Language]) onErr(
 	client *tgbotapi.TelegramBot, update tgbotapi.Update, err error) {
 

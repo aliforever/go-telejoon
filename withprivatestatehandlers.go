@@ -95,19 +95,19 @@ func (e *EngineWithPrivateStateHandlers[User]) WithLanguageConfig(
 			btnText = lang.tag
 		}
 
-		menu.AddButtonFunc(btnText,
-			func(bot *tgbotapi.TelegramBot, update *StateUpdate[User]) string {
-				err := cfg.repo.SetUserLanguage(update.Update.From().Id, lang.tag)
-				if err != nil {
-					e.onErr(bot, update.Update, err)
-					return ""
-				}
-
-				// TODO: maybe access to update should be protected and through getters, only a setter to change language
-				update.Language = &lang
-
-				return e.defaultStateName
-			})
+		// menu.AddButtonFunc(btnText,
+		// 	func(bot *tgbotapi.TelegramBot, update *StateUpdate[User]) string {
+		// 		err := cfg.repo.SetUserLanguage(update.Update.From().Id, lang.tag)
+		// 		if err != nil {
+		// 			e.onErr(bot, update.Update, err)
+		// 			return ""
+		// 		}
+		//
+		// 		// TODO: maybe access to update should be protected and through getters, only a setter to change language
+		// 		update.Language = &lang
+		//
+		// 		return e.defaultStateName
+		// 	})
 	}
 
 	text := ""
@@ -140,6 +140,14 @@ func (e *EngineWithPrivateStateHandlers[User]) process(client *tgbotapi.Telegram
 		return
 	}
 
+	su := &StateUpdate[User]{
+		context:    context.Background(),
+		State:      userState,
+		User:       user,
+		Update:     update,
+		IsSwitched: false,
+	}
+
 	var lang *Language
 
 	if e.languageConfig != nil {
@@ -148,7 +156,7 @@ func (e *EngineWithPrivateStateHandlers[User]) process(client *tgbotapi.Telegram
 			if err == UserLanguageNotFoundErr && e.languageConfig.forceChooseLanguage {
 				if userState != e.languageConfig.changeLanguageState {
 					err = e.switchState(
-						e.languageConfig.changeLanguageState, client, context.Background(), user, nil, update)
+						e.languageConfig.changeLanguageState, client, su)
 					if err != nil {
 						e.onErr(client, update, err)
 					}
@@ -163,19 +171,12 @@ func (e *EngineWithPrivateStateHandlers[User]) process(client *tgbotapi.Telegram
 		lang = e.languageConfig.languages.getByTag(userLanguage)
 	}
 
-	su := &StateUpdate[User]{
-		context:    context.Background(),
-		State:      userState,
-		User:       user,
-		Language:   lang,
-		Update:     update,
-		IsSwitched: false,
-	}
+	su.Language = lang
 
 	for _, f := range e.middlewares {
 		if nextState, ok := f(client, su); !ok {
 			if nextState != "" {
-				if err := e.switchState(nextState, client, su.context, user, lang, update); err != nil {
+				if err := e.switchState(nextState, client, su); err != nil {
 					e.onErr(client, update, err)
 				}
 			}
@@ -217,10 +218,11 @@ func (e *EngineWithPrivateStateHandlers[User]) processCallbackQuery(
 		}
 
 		if inlineMenu, ok := menu.buttonInlineMenus[command]; ok {
-			if inlineMenuHandler, ok := e.inlineMenus[inlineMenu.data]; ok {
-				e.processInlineHandler(inlineMenuHandler, client, update, inlineMenu.edit)
-				return
+			err := e.processInlineHandler(inlineMenu.data, client, update, inlineMenu.edit)
+			if err != nil {
+				e.onErr(client, update.Update, err)
 			}
+			return
 		}
 	}
 }
@@ -263,43 +265,34 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 				}
 			}
 
-			if response := handler.getReplyTextForButton(buttonText); response != "" {
-				_, err := client.Send(client.Message().SetText(response).SetChatId(from.Id))
-				if err != nil {
-					e.onErr(client, update.Update,
-						fmt.Errorf("error_sending_message_to_user: %d, %w", from.Id, err))
-					return
-				}
-				return
-			}
+			if handler.staticActionBuilder != nil {
+				if buttonAction := handler.staticActionBuilder.getButtonByButton(buttonText); buttonAction != nil {
+					var err error
 
-			if nextState := handler.getStateForButton(buttonText); nextState != "" {
-				if err := e.switchState(
-					nextState, client, update.context, update.User, update.Language, update.Update); err != nil {
+					switch buttonAction.Kind() {
+					case actionKindText:
+						_, err = client.Send(client.Message().SetText(buttonAction.Result()).SetChatId(from.Id))
+						if err != nil {
+							err = fmt.Errorf("error_sending_message_to_user: %d, %w", from.Id, err)
+						}
+					case actionKindState:
+						if err := e.switchState(buttonAction.Result(), client, update); err != nil {
+							err = fmt.Errorf("error_switching_state: %d, %w", from.Id, err)
+						}
+					case actionKindInlineMenu:
+						err = e.processInlineHandler(buttonAction.Result(), client, update, false)
+						if err != nil {
+							err = fmt.Errorf("error_switching_inline_menu: %d, %w", from.Id, err)
+						}
+					default:
+						err = fmt.Errorf("unknown_action_kind: %s", buttonAction.Kind())
+					}
 
-					e.onErr(client, update.Update, err)
-				}
-				return
-			}
-
-			if fn := handler.getFuncForButton(buttonText); fn != nil {
-				if nextState := fn(client, update); nextState != "" {
-					if err := e.switchState(
-						nextState, client, update.context, update.User, update.Language, update.Update); err != nil {
-
+					if err != nil {
 						e.onErr(client, update.Update, err)
+						return
 					}
 				}
-				return
-			}
-
-			if inlineMenu := handler.getInlineMenuForButton(buttonText); inlineMenu != "" {
-				if menu, ok := e.inlineMenus[inlineMenu]; !ok {
-					e.onErr(client, update.Update, fmt.Errorf("inline_menu_not_found: %s", inlineMenu))
-				} else {
-					e.processInlineHandler(menu, client, update, false)
-				}
-				return
 			}
 		}
 	}
@@ -348,7 +341,12 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 }
 
 func (e *EngineWithPrivateStateHandlers[User]) processInlineHandler(
-	menu *InlineMenu[User], client *tgbotapi.TelegramBot, update *StateUpdate[User], edit bool) {
+	menuName string, client *tgbotapi.TelegramBot, update *StateUpdate[User], edit bool) error {
+
+	menu, ok := e.inlineMenus[menuName]
+	if !ok {
+		return fmt.Errorf("inline_menu_not_found: %s", menuName)
+	}
 
 	from := update.Update.From()
 
@@ -368,29 +366,28 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineHandler(
 
 		_, err := client.Send(cfg)
 		if err != nil {
-			e.onErr(client, update.Update,
-				fmt.Errorf("error_sending_message_to_user: %d, %w", from.Id, err))
-			return
+			return fmt.Errorf("error_sending_message_to_user: %d, %w", from.Id, err)
 		}
 	}
+
+	return nil
 }
 
 func (e *EngineWithPrivateStateHandlers[User]) switchState(
-	nextState string, client *tgbotapi.TelegramBot, ctx context.Context, user User,
-	language *Language, update tgbotapi.Update) error {
+	nextState string, client *tgbotapi.TelegramBot, stateUpdate *StateUpdate[User]) error {
 
-	from := update.From()
+	from := stateUpdate.Update.From()
 
 	if handler := e.staticMenus[nextState]; handler != nil {
 		if err := e.userRepository.SetState(from.Id, nextState); err != nil {
 			return fmt.Errorf("error_setting_user_state: %d, %w", from.Id, err)
 		}
 		e.processStaticHandler(handler, client, &StateUpdate[User]{
-			context:    ctx,
+			context:    stateUpdate.context,
 			State:      nextState,
-			Language:   language,
-			User:       user,
-			Update:     update,
+			Language:   stateUpdate.Language,
+			User:       stateUpdate.User,
+			Update:     stateUpdate.Update,
 			IsSwitched: true,
 		})
 		return nil

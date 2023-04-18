@@ -199,7 +199,7 @@ func (i *InlineMenu[User]) AddReplyWithFunc(
 	return i
 }
 
-// SetButtonFormation sets the button formation.
+// SetButtonFormation sets the action formation.
 // The formation is a slice of int, each representing number of buttons in a row.
 func (i *InlineMenu[User]) SetButtonFormation(formation ...int) *InlineMenu[User] {
 	i.lock.Lock()
@@ -282,7 +282,7 @@ func (i *InlineMenu[User]) getInlineKeyboardMarkup(language *Language) *structs.
 	return tools.Keyboards{}.NewInlineKeyboardFromSlicesOfMaps(rows)
 }
 
-// getButtonAlertByCommand returns the button alert by command.
+// getButtonAlertByCommand returns the action alert by command.
 func (i *InlineMenu[User]) getButtonAlertByButton(btn string) *buttonAlert {
 	for key := range i.buttonAlerts {
 		ba := i.buttonAlerts[key]
@@ -295,7 +295,7 @@ func (i *InlineMenu[User]) getButtonAlertByButton(btn string) *buttonAlert {
 	return nil
 }
 
-// getInlineMenuByButton returns the inline menu by button.
+// getInlineMenuByButton returns the inline menu by action.
 func (i *InlineMenu[User]) getInlineMenuByButton(btn string) *buttonInlineMenu {
 	for key := range i.buttonInlineMenus {
 		ba := i.buttonInlineMenus[key]
