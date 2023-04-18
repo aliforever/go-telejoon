@@ -138,7 +138,7 @@ func (e *EngineWithPrivateStateHandlers[User]) process(client *tgbotapi.Telegram
 	}
 
 	su := &StateUpdate[User]{
-		context:    context.Background(),
+		context:    context.WithValue(context.Background(), "storage", &sync.Map{}),
 		State:      userState,
 		User:       user,
 		Update:     update,
