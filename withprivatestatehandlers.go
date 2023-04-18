@@ -237,11 +237,13 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 						fmt.Errorf("error_setting_user_state: %d, %w", from.Id, err))
 					return
 				}
+
 				e.processStaticHandler(e.staticMenus[nextState], client, &StateUpdate[User]{
 					context:    update.context,
 					State:      nextState,
 					User:       update.User,
 					Update:     update.Update,
+					language:   update.language,
 					IsSwitched: true,
 				})
 			}
