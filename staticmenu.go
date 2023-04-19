@@ -14,24 +14,18 @@ type StaticMenu[User any] struct {
 
 	replyWithFunc func(*tgbotapi.TelegramBot, *StateUpdate[User])
 
-	buttonFuncs        map[string]func(*tgbotapi.TelegramBot, *StateUpdate[User]) string
-	languageKeyButtons map[string]bool
+	actionBuilder *actionBuilder
 
-	staticActionBuilder *staticActionBuilder
+	dynamicHandlers *dynamicHandlers[User]
 
 	middlewares []func(*tgbotapi.TelegramBot, *StateUpdate[User]) (string, bool)
-
-	buttons []string
 
 	actions map[string]bool
 }
 
 // NewStaticMenu creates a new raw StaticMenu[User UserI[User]].
 func NewStaticMenu[User any]() *StaticMenu[User] {
-	return &StaticMenu[User]{
-		buttonFuncs:        make(map[string]func(*tgbotapi.TelegramBot, *StateUpdate[User]) string),
-		languageKeyButtons: make(map[string]bool),
-	}
+	return &StaticMenu[User]{}
 }
 
 // AddMiddleware adds a new middleware to the handler.
@@ -48,12 +42,24 @@ func (s *StaticMenu[User]) AddMiddleware(
 
 // WithStaticActionBuilder sets the static action builder for the handler.
 func (s *StaticMenu[User]) WithStaticActionBuilder(
-	builder *staticActionBuilder) *StaticMenu[User] {
+	builder *actionBuilder) *StaticMenu[User] {
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.staticActionBuilder = builder
+	s.actionBuilder = builder
+
+	return s
+}
+
+// WithDynamicHandlers sets the dynamic handlers for the handler.
+func (s *StaticMenu[User]) WithDynamicHandlers(
+	handlers *dynamicHandlers[User]) *StaticMenu[User] {
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.dynamicHandlers = handlers
 
 	return s
 }

@@ -239,22 +239,22 @@ func (i *InlineMenu[User]) getInlineKeyboardMarkup(language *Language) *structs.
 
 		if data, ok := i.buttonData[button]; ok {
 			row = append(row, map[string]string{
-				"text":          buttonText,
+				"textHandler":   buttonText,
 				"callback_data": data,
 			})
 		} else if ba := i.getButtonAlertByButton(button); ba != nil {
 			row = append(row, map[string]string{
-				"text":          buttonText,
+				"textHandler":   buttonText,
 				"callback_data": ba.data,
 			})
 		} else if url, ok := i.buttonUrls[button]; ok {
 			row = append(row, map[string]string{
-				"text": buttonText,
-				"url":  url,
+				"textHandler": buttonText,
+				"url":         url,
 			})
 		} else if bim := i.getInlineMenuByButton(button); bim != nil {
 			row = append(row, map[string]string{
-				"text":          buttonText,
+				"textHandler":   buttonText,
 				"callback_data": bim.data,
 			})
 		}

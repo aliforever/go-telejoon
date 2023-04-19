@@ -252,16 +252,16 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 		if !update.IsSwitched {
 			buttonText := update.Update.Message.Text
 
-			if update.language != nil && handler.staticActionBuilder != nil {
-				if languageValueKeys := handler.staticActionBuilder.languageValueButtonKeys(update.language); languageValueKeys != nil {
+			if update.language != nil && handler.actionBuilder != nil {
+				if languageValueKeys := handler.actionBuilder.languageValueButtonKeys(update.language); languageValueKeys != nil {
 					if languageValueKey := languageValueKeys[buttonText]; languageValueKey != "" {
 						buttonText = languageValueKey
 					}
 				}
 			}
 
-			if handler.staticActionBuilder != nil {
-				if buttonAction := handler.staticActionBuilder.getButtonByButton(buttonText); buttonAction != nil {
+			if handler.actionBuilder != nil {
+				if buttonAction := handler.actionBuilder.getButtonByButton(buttonText); buttonAction != nil {
 					var err error
 
 					switch buttonAction.Kind() {
@@ -294,13 +294,25 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 					return
 				}
 			}
+
+			if handler.dynamicHandlers != nil && handler.dynamicHandlers.textHandler != nil {
+				if nextState, processed := handler.dynamicHandlers.textHandler(client, update); nextState != "" {
+					err := e.switchState(nextState, client, update)
+					if err != nil {
+						e.onErr(client, update.Update, err)
+						return
+					}
+				} else if processed {
+					return
+				}
+			}
 		}
 	}
 
 	var replyMarkup *structs.ReplyKeyboardMarkup
 
-	if handler.staticActionBuilder != nil {
-		replyMarkup = handler.staticActionBuilder.buildButtons(update.language)
+	if handler.actionBuilder != nil {
+		replyMarkup = handler.actionBuilder.buildButtons(update.language)
 	}
 
 	if replyText := handler.getReplyText(); replyText != "" {

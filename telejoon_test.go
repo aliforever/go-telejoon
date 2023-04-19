@@ -88,6 +88,17 @@ func TestStart(t *testing.T) {
 								AddTextButton("Hello", "You said Hello").
 								AddStateButton("Info State", "Info").
 								AddInlineMenuButton("Info", "Info")).
+							WithDynamicHandlers(telejoon.NewDynamicHandlers[ExampleUser]().
+								WithTextHandler(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (string, bool) {
+									if update.Update.Message.Text == "Hello Bro" {
+										client.Send(client.Message().SetChatId(update.User.Id).
+											SetText("Hello Bro!"))
+
+										return "", true
+									}
+
+									return "", false
+								})).
 							ReplyWithLanguageKey("Welcome.Main")).
 					// AddStaticMenu("Info",
 					// 	telejoon.NewStaticMenu[ExampleUser]().

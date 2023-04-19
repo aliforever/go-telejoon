@@ -19,7 +19,7 @@ func (b *ButtonOptions) TranslateName() *ButtonOptions {
 	return b
 }
 
-// TranslateText sets whether to translate the text of the action.
+// TranslateText sets whether to translate the textHandler of the action.
 func (b *ButtonOptions) TranslateText() *ButtonOptions {
 	b.translateText = true
 	return b
@@ -31,7 +31,7 @@ func (b *ButtonOptions) DoNotTranslateName() *ButtonOptions {
 	return b
 }
 
-// DoNotTranslateText sets whether to translate the text of the action.
+// DoNotTranslateText sets whether to translate the textHandler of the action.
 func (b *ButtonOptions) DoNotTranslateText() *ButtonOptions {
 	b.translateText = false
 	return b

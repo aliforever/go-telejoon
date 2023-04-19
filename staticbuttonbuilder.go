@@ -15,6 +15,7 @@ const (
 	ActionKindText       ActionKind = "TEXT"
 	ActionKindInlineMenu ActionKind = "INLINE_MENU"
 	ActionKindState      ActionKind = "STATE"
+	ActionKindRaw        ActionKind = "RAW"
 )
 
 type baseCommand struct {
@@ -146,13 +147,32 @@ func (t stateButton) Result() string {
 
 // --------------------------------------------
 
+// rawButton is only a raw button that does nothing but sends the button name.
+type rawButton struct {
+	baseButton
+}
+
+func (t rawButton) Name() string {
+	return t.button
+}
+
+func (t rawButton) Kind() ActionKind {
+	return ActionKindRaw
+}
+
+func (t rawButton) Result() string {
+	return ""
+}
+
+// --------------------------------------------
+
 type Action interface {
 	Name() string
 	Kind() ActionKind
 	Result() string
 }
 
-type staticActionBuilder struct {
+type actionBuilder struct {
 	locker sync.Mutex
 
 	buttons  []Action
@@ -161,15 +181,15 @@ type staticActionBuilder struct {
 	buttonOptions map[string][]*ButtonOptions
 }
 
-// NewActionBuilder creates a new staticActionBuilder.
-func NewActionBuilder() *staticActionBuilder {
-	return &staticActionBuilder{
+// NewActionBuilder creates a new actionBuilder.
+func NewActionBuilder() *actionBuilder {
+	return &actionBuilder{
 		buttonOptions: make(map[string][]*ButtonOptions),
 	}
 }
 
-// AddTextButton adds a text action to the staticActionBuilder.
-func (b *staticActionBuilder) AddTextButton(button, text string, opts ...*ButtonOptions) *staticActionBuilder {
+// AddTextButton adds a textHandler action to the actionBuilder.
+func (b *actionBuilder) AddTextButton(button, text string, opts ...*ButtonOptions) *actionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -188,8 +208,8 @@ func (b *staticActionBuilder) AddTextButton(button, text string, opts ...*Button
 	return b
 }
 
-// AddTextButtonT adds a text action to the staticActionBuilder with name translation.
-func (b *staticActionBuilder) AddTextButtonT(button, text string, opts ...*ButtonOptions) *staticActionBuilder {
+// AddTextButtonT adds a textHandler action to the actionBuilder with name translation.
+func (b *actionBuilder) AddTextButtonT(button, text string, opts ...*ButtonOptions) *actionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -208,9 +228,9 @@ func (b *staticActionBuilder) AddTextButtonT(button, text string, opts ...*Butto
 	return b
 }
 
-// AddInlineMenuButton adds an inline menu action to the staticActionBuilder.
-func (b *staticActionBuilder) AddInlineMenuButton(
-	button, inlineMenu string, opts ...*ButtonOptions) *staticActionBuilder {
+// AddInlineMenuButton adds an inline menu action to the actionBuilder.
+func (b *actionBuilder) AddInlineMenuButton(
+	button, inlineMenu string, opts ...*ButtonOptions) *actionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -229,8 +249,8 @@ func (b *staticActionBuilder) AddInlineMenuButton(
 	return b
 }
 
-// AddInlineMenuButtonT adds an inline menu action to the staticActionBuilder with name translation.
-func (b *staticActionBuilder) AddInlineMenuButtonT(button, inlineMenu string) *staticActionBuilder {
+// AddInlineMenuButtonT adds an inline menu action to the actionBuilder with name translation.
+func (b *actionBuilder) AddInlineMenuButtonT(button, inlineMenu string) *actionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -248,8 +268,8 @@ func (b *staticActionBuilder) AddInlineMenuButtonT(button, inlineMenu string) *s
 	return b
 }
 
-// AddStateButton adds a state action to the staticActionBuilder.
-func (b *staticActionBuilder) AddStateButton(button, state string, opts ...*ButtonOptions) *staticActionBuilder {
+// AddStateButton adds a state action to the actionBuilder.
+func (b *actionBuilder) AddStateButton(button, state string, opts ...*ButtonOptions) *actionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -267,8 +287,8 @@ func (b *staticActionBuilder) AddStateButton(button, state string, opts ...*Butt
 	return b
 }
 
-// AddStateButtonT adds a state action to the staticActionBuilder with name translation.
-func (b *staticActionBuilder) AddStateButtonT(button, state string) *staticActionBuilder {
+// AddStateButtonT adds a state action to the actionBuilder with name translation.
+func (b *actionBuilder) AddStateButtonT(button, state string) *actionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -285,8 +305,45 @@ func (b *staticActionBuilder) AddStateButtonT(button, state string) *staticActio
 	return b
 }
 
-// AddTextCommand adds a text command to the staticActionBuilder.
-func (b *staticActionBuilder) AddTextCommand(command, text string) *staticActionBuilder {
+// AddRawButton adds a raw button to the actionBuilder.
+func (b *actionBuilder) AddRawButton(button string, opts ...*ButtonOptions) *actionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	b.buttons = append(b.buttons, rawButton{
+		baseButton: baseButton{
+			button:  button,
+			options: opts,
+		},
+	})
+
+	if len(opts) > 0 {
+		b.buttonOptions[button] = opts
+	}
+
+	return b
+}
+
+// AddRawButtonT adds a raw button to the actionBuilder with name translation.
+func (b *actionBuilder) AddRawButtonT(button string) *actionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	b.buttons = append(b.buttons, rawButton{
+		baseButton: baseButton{
+			button: button,
+		},
+	})
+
+	b.buttonOptions[button] = []*ButtonOptions{
+		NewButtonOptions().TranslateName(),
+	}
+
+	return b
+}
+
+// AddTextCommand adds a textHandler command to the actionBuilder.
+func (b *actionBuilder) AddTextCommand(command, text string) *actionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -300,8 +357,8 @@ func (b *staticActionBuilder) AddTextCommand(command, text string) *staticAction
 	return b
 }
 
-// AddInlineMenuCommand adds an inline menu command to the staticActionBuilder.
-func (b *staticActionBuilder) AddInlineMenuCommand(command, inlineMenu string) *staticActionBuilder {
+// AddInlineMenuCommand adds an inline menu command to the actionBuilder.
+func (b *actionBuilder) AddInlineMenuCommand(command, inlineMenu string) *actionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -315,8 +372,8 @@ func (b *staticActionBuilder) AddInlineMenuCommand(command, inlineMenu string) *
 	return b
 }
 
-// AddStateCommand adds a state command to the staticActionBuilder.
-func (b *staticActionBuilder) AddStateCommand(command, state string) *staticActionBuilder {
+// AddStateCommand adds a state command to the actionBuilder.
+func (b *actionBuilder) AddStateCommand(command, state string) *actionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -330,8 +387,8 @@ func (b *staticActionBuilder) AddStateCommand(command, state string) *staticActi
 	return b
 }
 
-// AddCustomButton adds a custom action of button type to the staticActionBuilder.
-func (b *staticActionBuilder) AddCustomButton(action Action) *staticActionBuilder {
+// AddCustomButton adds a custom action of button type to the actionBuilder.
+func (b *actionBuilder) AddCustomButton(action Action) *actionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -340,8 +397,8 @@ func (b *staticActionBuilder) AddCustomButton(action Action) *staticActionBuilde
 	return b
 }
 
-// AddCustomCommand adds a custom action of command type to the staticActionBuilder.
-func (b *staticActionBuilder) AddCustomCommand(action Action) *staticActionBuilder {
+// AddCustomCommand adds a custom action of command type to the actionBuilder.
+func (b *actionBuilder) AddCustomCommand(action Action) *actionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -351,7 +408,7 @@ func (b *staticActionBuilder) AddCustomCommand(action Action) *staticActionBuild
 }
 
 // getButtonByButton returns the action by the button.
-func (b *staticActionBuilder) getButtonByButton(button string) Action {
+func (b *actionBuilder) getButtonByButton(button string) Action {
 	for _, btn := range b.buttons {
 		if btn.Name() == button {
 			return btn
@@ -362,7 +419,7 @@ func (b *staticActionBuilder) getButtonByButton(button string) Action {
 }
 
 // buildButtons builds the buttons.
-func (b *staticActionBuilder) buildButtons(language *Language) *structs.ReplyKeyboardMarkup {
+func (b *actionBuilder) buildButtons(language *Language) *structs.ReplyKeyboardMarkup {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -392,7 +449,7 @@ func (b *staticActionBuilder) buildButtons(language *Language) *structs.ReplyKey
 	return tools.Keyboards{}.NewReplyKeyboardFromSliceOfStrings(newButtons, 2)
 }
 
-func (b *staticActionBuilder) languageValueButtonKeys(language *Language) map[string]string {
+func (b *actionBuilder) languageValueButtonKeys(language *Language) map[string]string {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
