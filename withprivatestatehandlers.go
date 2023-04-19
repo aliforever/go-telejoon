@@ -264,6 +264,8 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 				if buttonAction := handler.actionBuilder.getButtonByButton(buttonText); buttonAction != nil {
 					var err error
 
+					shouldStop := true
+
 					switch buttonAction.Kind() {
 					case ActionKindText:
 						text := buttonAction.Result()
@@ -283,6 +285,7 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 							err = fmt.Errorf("error_switching_inline_menu: %d, %w", from.Id, err)
 						}
 					case ActionKindRaw:
+						shouldStop = false
 						// do nothing for raw action, as it is only used to act like a button and may be handled in a
 						// dynamic handler
 						break
@@ -292,6 +295,10 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 
 					if err != nil {
 						e.onErr(client, update.Update, err)
+						return
+					}
+
+					if shouldStop {
 						return
 					}
 				}

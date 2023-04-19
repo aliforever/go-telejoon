@@ -2,6 +2,7 @@ package telejoon_test
 
 import (
 	"context"
+	"fmt"
 	tgbotapi "github.com/aliforever/go-telegram-bot-api"
 	"github.com/aliforever/go-telegram-bot-api/structs"
 	"github.com/aliforever/go-telejoon"
@@ -81,6 +82,7 @@ func TestStart(t *testing.T) {
 						telejoon.NewStaticMenu[ExampleUser]().
 							AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (string, bool) {
 								update.Set("name", "Ali")
+
 								return "", true
 							}).
 							WithStaticActionBuilder(telejoon.NewActionBuilder().
@@ -90,14 +92,19 @@ func TestStart(t *testing.T) {
 								AddInlineMenuButton("Info", "Info")).
 							WithDynamicHandlers(telejoon.NewDynamicHandlers[ExampleUser]().
 								WithTextHandler(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (string, bool) {
+									fmt.Println("name is:", update.Get("name"))
 									if update.Update.Message.Text == "Hello Bro" {
 										client.Send(client.Message().SetChatId(update.User.Id).
 											SetText("Hello Bro!"))
+										fmt.Println("update inside dynamic text handler", update)
 
-										return "", true
+										fmt.Println("changing name to:", "Ali 2")
+										update.Set("name", "Ali 2")
+
+										return "", false
 									}
 
-									return "", false
+									return "", true
 								})).
 							ReplyWithLanguageKey("Welcome.Main")).
 					// AddStaticMenu("Info",
