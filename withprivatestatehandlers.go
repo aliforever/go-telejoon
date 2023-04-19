@@ -282,6 +282,10 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 						if err != nil {
 							err = fmt.Errorf("error_switching_inline_menu: %d, %w", from.Id, err)
 						}
+					case ActionKindRaw:
+						// do nothing for raw action, as it is only used to act like a button and may be handled in a
+						// dynamic handler
+						break
 					default:
 						err = fmt.Errorf("unknown_action_kind: %s", buttonAction.Kind())
 					}
@@ -290,8 +294,6 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 						e.onErr(client, update.Update, err)
 						return
 					}
-
-					return
 				}
 			}
 
