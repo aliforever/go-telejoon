@@ -5,7 +5,7 @@ import tgbotapi "github.com/aliforever/go-telegram-bot-api"
 // DynamicHandlers is a struct that holds all the dynamic handlers
 // for example: text, photo, audio, document, sticker, video, voice, location, contact, video_note, venue, poll, dice
 // it either returns an empty string or a string that represents the next state
-// returning true means the update is processed
+// returning false means the update shouldn't be processed
 type dynamicHandlers[User any] struct {
 	textHandler      func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)
 	photoHandler     func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)

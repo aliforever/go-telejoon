@@ -296,13 +296,13 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 			}
 
 			if handler.dynamicHandlers != nil && handler.dynamicHandlers.textHandler != nil {
-				if nextState, processed := handler.dynamicHandlers.textHandler(client, update); nextState != "" {
+				if nextState, next := handler.dynamicHandlers.textHandler(client, update); nextState != "" {
 					err := e.switchState(nextState, client, update)
 					if err != nil {
 						e.onErr(client, update.Update, err)
 						return
 					}
-				} else if processed {
+				} else if !next {
 					return
 				}
 			}
