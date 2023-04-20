@@ -179,6 +179,9 @@ type actionBuilder struct {
 	commands []Action
 
 	buttonOptions map[string][]*ButtonOptions
+
+	buttonFormation []int
+	maxButtonPerRow int
 }
 
 // NewActionBuilder creates a new actionBuilder.
@@ -186,6 +189,25 @@ func NewActionBuilder() *actionBuilder {
 	return &actionBuilder{
 		buttonOptions: make(map[string][]*ButtonOptions),
 	}
+}
+
+// SetMaxButtonPerRow sets the maximum number of buttons per row.
+func (b *actionBuilder) SetMaxButtonPerRow(max int) *actionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	b.maxButtonPerRow = max
+
+	return b
+}
+
+func (b *actionBuilder) SetButtonFormation(formation ...int) *actionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	b.buttonFormation = formation
+
+	return b
 }
 
 // AddTextButton adds a textHandler action to the actionBuilder.
@@ -446,7 +468,7 @@ func (b *actionBuilder) buildButtons(language *Language) *structs.ReplyKeyboardM
 		}
 	}
 
-	return tools.Keyboards{}.NewReplyKeyboardFromSliceOfStrings(newButtons, 2)
+	return tools.Keyboards{}.NewReplyKeyboardFromSliceOfStringsWithFormation(newButtons, 2, b.buttonFormation)
 }
 
 func (b *actionBuilder) languageValueButtonKeys(language *Language) map[string]string {

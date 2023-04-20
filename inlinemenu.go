@@ -222,7 +222,6 @@ func (i *InlineMenu[User]) SetMaxButtonPerRow(max int) *InlineMenu[User] {
 
 // getInlineKeyboardMarkup returns the inline keyboard markup.
 func (i *InlineMenu[User]) getInlineKeyboardMarkup(language *Language) *structs.InlineKeyboardMarkup {
-	var rows [][]map[string]string
 	var row []map[string]string
 
 	for _, button := range i.buttons {
@@ -258,28 +257,10 @@ func (i *InlineMenu[User]) getInlineKeyboardMarkup(language *Language) *structs.
 				"callback_data": bim.data,
 			})
 		}
-
-		cond := len(row) >= 2
-
-		if i.maxButtonPerRow > 0 {
-			cond = len(row) >= i.maxButtonPerRow
-		}
-
-		if len(i.buttonFormation) > len(rows) {
-			cond = len(row) >= i.buttonFormation[len(rows)]
-		}
-
-		if cond {
-			rows = append(rows, row)
-			row = nil
-		}
 	}
 
-	if len(row) > 0 {
-		rows = append(rows, row)
-	}
-
-	return tools.Keyboards{}.NewInlineKeyboardFromSlicesOfMaps(rows)
+	return tools.Keyboards{}.NewInlineKeyboardFromSlicesOfMapWithFormation(
+		row, 2, i.maxButtonPerRow, i.buttonFormation)
 }
 
 // getButtonAlertByCommand returns the action alert by command.
