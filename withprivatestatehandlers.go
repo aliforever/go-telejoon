@@ -309,8 +309,8 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 					err := e.switchState(nextState, client, update)
 					if err != nil {
 						e.onErr(client, update.Update, err)
-						return
 					}
+					return
 				} else if !next {
 					return
 				}
