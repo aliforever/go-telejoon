@@ -468,7 +468,7 @@ func (b *actionBuilder) buildButtons(language *Language) *structs.ReplyKeyboardM
 		}
 	}
 
-	return tools.Keyboards{}.NewReplyKeyboardFromSliceOfStringsWithFormation(newButtons, 2, b.buttonFormation)
+	return tools.Keyboards{}.NewReplyKeyboardFromSliceOfStringsWithFormation(newButtons, b.maxButtonPerRow, b.buttonFormation)
 }
 
 func (b *actionBuilder) languageValueButtonKeys(language *Language) map[string]string {

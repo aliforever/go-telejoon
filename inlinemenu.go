@@ -260,7 +260,7 @@ func (i *InlineMenu[User]) getInlineKeyboardMarkup(language *Language) *structs.
 	}
 
 	return tools.Keyboards{}.NewInlineKeyboardFromSlicesOfMapWithFormation(
-		row, 2, i.maxButtonPerRow, i.buttonFormation)
+		row, i.maxButtonPerRow, i.buttonFormation)
 }
 
 // getButtonAlertByCommand returns the action alert by command.
