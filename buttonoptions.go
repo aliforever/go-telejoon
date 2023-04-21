@@ -3,6 +3,8 @@ package telejoon
 type ButtonOptions struct {
 	translateName bool
 	translateText bool
+	breakBefore   bool
+	breakAfter    bool
 }
 
 // NewButtonOptions creates a new ButtonOptions.
@@ -11,6 +13,18 @@ func NewButtonOptions() *ButtonOptions {
 		translateName: true,
 		translateText: true,
 	}
+}
+
+// BreakBefore sets whether to break before the button when building keyboard.
+func (b *ButtonOptions) BreakBefore() *ButtonOptions {
+	b.breakBefore = true
+	return b
+}
+
+// BreakAfter sets whether to break after the button when building keyboard.
+func (b *ButtonOptions) BreakAfter() *ButtonOptions {
+	b.breakAfter = true
+	return b
 }
 
 // TranslateName sets whether to translate the title of the action.

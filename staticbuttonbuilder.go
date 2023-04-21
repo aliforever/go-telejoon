@@ -247,6 +247,10 @@ func (b *actionBuilder) AddTextButtonT(button, text string, opts ...*ButtonOptio
 		NewButtonOptions().TranslateName(),
 	}
 
+	if len(opts) > 0 {
+		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
+	}
+
 	return b
 }
 
@@ -272,7 +276,7 @@ func (b *actionBuilder) AddInlineMenuButton(
 }
 
 // AddInlineMenuButtonT adds an inline menu action to the actionBuilder with name translation.
-func (b *actionBuilder) AddInlineMenuButtonT(button, inlineMenu string) *actionBuilder {
+func (b *actionBuilder) AddInlineMenuButtonT(button, inlineMenu string, opts ...*ButtonOptions) *actionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -285,6 +289,10 @@ func (b *actionBuilder) AddInlineMenuButtonT(button, inlineMenu string) *actionB
 
 	b.buttonOptions[button] = []*ButtonOptions{
 		NewButtonOptions().TranslateName(),
+	}
+
+	if len(opts) > 0 {
+		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
 	}
 
 	return b
@@ -306,11 +314,15 @@ func (b *actionBuilder) AddStateButton(button, state string, opts ...*ButtonOpti
 		b.buttonOptions[button] = opts
 	}
 
+	if len(opts) > 0 {
+		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
+	}
+
 	return b
 }
 
 // AddStateButtonT adds a state action to the actionBuilder with name translation.
-func (b *actionBuilder) AddStateButtonT(button, state string) *actionBuilder {
+func (b *actionBuilder) AddStateButtonT(button, state string, opts ...*ButtonOptions) *actionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -322,6 +334,10 @@ func (b *actionBuilder) AddStateButtonT(button, state string) *actionBuilder {
 
 	b.buttonOptions[button] = []*ButtonOptions{
 		NewButtonOptions().TranslateName(),
+	}
+
+	if len(opts) > 0 {
+		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
 	}
 
 	return b
@@ -343,11 +359,15 @@ func (b *actionBuilder) AddRawButton(button string, opts ...*ButtonOptions) *act
 		b.buttonOptions[button] = opts
 	}
 
+	if len(opts) > 0 {
+		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
+	}
+
 	return b
 }
 
 // AddRawButtonT adds a raw button to the actionBuilder with name translation.
-func (b *actionBuilder) AddRawButtonT(button string) *actionBuilder {
+func (b *actionBuilder) AddRawButtonT(button string, opts ...*ButtonOptions) *actionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -359,6 +379,10 @@ func (b *actionBuilder) AddRawButtonT(button string) *actionBuilder {
 
 	b.buttonOptions[button] = []*ButtonOptions{
 		NewButtonOptions().TranslateName(),
+	}
+
+	if len(opts) > 0 {
+		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
 	}
 
 	return b
@@ -410,11 +434,15 @@ func (b *actionBuilder) AddStateCommand(command, state string) *actionBuilder {
 }
 
 // AddCustomButton adds a custom action of button type to the actionBuilder.
-func (b *actionBuilder) AddCustomButton(action Action) *actionBuilder {
+func (b *actionBuilder) AddCustomButton(action Action, opts ...*ButtonOptions) *actionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
 	b.buttons = append(b.buttons, action)
+
+	if len(opts) > 0 {
+		b.buttonOptions[action.Name()] = append(b.buttonOptions[action.Name()], opts...)
+	}
 
 	return b
 }
@@ -449,26 +477,41 @@ func (b *actionBuilder) buildButtons(language *Language) *structs.ReplyKeyboardM
 		return nil
 	}
 
-	var newButtons = make([]string, len(b.buttons))
+	newButtons := []string{}
 
-	for i, button := range b.buttons {
-		newButtons[i] = button.Name()
-	}
+	for _, button := range b.buttons {
+		name := button.Name()
 
-	if language != nil {
-		for i, button := range b.buttons {
-			if opts := b.buttonOptions[button.Name()]; len(opts) > 0 {
+		shouldBreakAfter := false
+
+		if opts := b.buttonOptions[button.Name()]; len(opts) > 0 {
+			if language != nil {
 				if opts[0].translateName {
 					btnText, err := language.Get(button.Name())
 					if err == nil {
-						newButtons[i] = btnText
+						name = btnText
 					}
 				}
 			}
+
+			if opts[0].breakBefore {
+				newButtons = append(newButtons, "")
+			}
+
+			if opts[0].breakAfter {
+				shouldBreakAfter = true
+			}
+		}
+
+		newButtons = append(newButtons, name)
+
+		if shouldBreakAfter {
+			newButtons = append(newButtons, "")
 		}
 	}
 
-	return tools.Keyboards{}.NewReplyKeyboardFromSliceOfStringsWithFormation(newButtons, b.maxButtonPerRow, b.buttonFormation)
+	return tools.Keyboards{}.NewReplyKeyboardFromSliceOfStringsWithFormation(
+		newButtons, b.maxButtonPerRow, b.buttonFormation)
 }
 
 func (b *actionBuilder) languageValueButtonKeys(language *Language) map[string]string {
