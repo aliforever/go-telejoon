@@ -69,8 +69,8 @@ type Languages struct {
 	localizers []Language
 }
 
-// getByTag returns the localizer by the given tag.
-func (l *Languages) getByTag(tag string) *Language {
+// GetByTag returns the localizer by the given tag.
+func (l *Languages) GetByTag(tag string) *Language {
 	for index := range l.localizers {
 		localizer := l.localizers[index]
 		if localizer.tag == tag {

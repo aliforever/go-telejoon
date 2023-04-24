@@ -164,7 +164,7 @@ func (e *EngineWithPrivateStateHandlers[User]) process(client *tgbotapi.Telegram
 			}
 		}
 
-		lang = e.languageConfig.languages.getByTag(userLanguage)
+		lang = e.languageConfig.languages.GetByTag(userLanguage)
 	}
 
 	su.language = lang
