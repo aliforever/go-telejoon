@@ -7,7 +7,7 @@ import (
 func Start(client *tgbotapi.TelegramBot, processor Processor) {
 	for update := range client.Updates() {
 		if processor.canProcess(update) {
-			go processor.process(client, update)
+			go processor.Process(client, update)
 		}
 	}
 }

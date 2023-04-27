@@ -59,6 +59,12 @@ func TestStart(t *testing.T) {
 	languageConfig := telejoon.NewLanguageConfig(languages, telejoon.NewDefaultUserLanguageRepository()).
 		WithChangeLanguageMenu("ChangeLanguage", true)
 
+	actionBuilder := telejoon.NewActionBuilder().
+		AddStateButtonT("Welcome.ChangeLanguageBtn", "ChangeLanguage").
+		AddTextButton("Hello", "You said Hello").
+		AddStateButton("Info State", "Info").
+		AddInlineMenuButton("Info", "Info")
+
 	type args struct {
 		client    *tgbotapi.TelegramBot
 		processor telejoon.Processor
@@ -85,14 +91,13 @@ func TestStart(t *testing.T) {
 
 								return "", true
 							}).
-							WithStaticActionBuilder(telejoon.NewActionBuilder().
-								AddStateButtonT("Welcome.ChangeLanguageBtn", "ChangeLanguage").
-								AddTextButton("Hello", "You said Hello").
-								AddStateButton("Info State", "Info").
-								AddInlineMenuButton("Info", "Info")).
+							WithStaticActionBuilder(actionBuilder).
 							WithDynamicHandlers(telejoon.NewDynamicHandlers[ExampleUser]().
 								WithTextHandler(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (string, bool) {
 									fmt.Println("name is:", update.Get("name"))
+									if update.Update.From() != nil && update.Update.From().Id == 81997375 {
+										actionBuilder.AddTextButton("This is meant for Error", "You said Hello Bro")
+									}
 									if update.Update.Message.Text == "Hello Bro" {
 										client.Send(client.Message().SetChatId(update.User.Id).
 											SetText("Hello Bro!"))

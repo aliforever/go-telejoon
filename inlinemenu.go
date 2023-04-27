@@ -39,15 +39,9 @@ type InlineMenu[User any] struct {
 
 	buttonFormation []int
 	maxButtonPerRow int
-}
 
-/*
-buy:1234
--> open a link
--> send a new message
--> edit current message
--> reply with callback
-*/
+	middlewares []func(*tgbotapi.TelegramBot, *CallbackUpdate[User]) bool
+}
 
 func NewInlineMenu[User any]() *InlineMenu[User] {
 	return &InlineMenu[User]{
@@ -57,6 +51,16 @@ func NewInlineMenu[User any]() *InlineMenu[User] {
 		buttonInlineMenus:  make(map[string]*buttonInlineMenu),
 		languageKeyButtons: make(map[string]bool),
 	}
+}
+
+// AddMiddleware adds a middleware to the inline menu
+func (i *InlineMenu[User]) AddMiddleware(middleware func(*tgbotapi.TelegramBot, *CallbackUpdate[User]) bool) *InlineMenu[User] {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
+	i.middlewares = append(i.middlewares, middleware)
+
+	return i
 }
 
 func (i *InlineMenu[User]) AddButtonData(button, data string) *InlineMenu[User] {
@@ -220,8 +224,8 @@ func (i *InlineMenu[User]) SetMaxButtonPerRow(max int) *InlineMenu[User] {
 	return i
 }
 
-// getInlineKeyboardMarkup returns the inline keyboard markup.
-func (i *InlineMenu[User]) getInlineKeyboardMarkup(language *Language) *structs.InlineKeyboardMarkup {
+// GetInlineKeyboardMarkup returns the inline keyboard markup.
+func (i *InlineMenu[User]) GetInlineKeyboardMarkup(language *Language) *structs.InlineKeyboardMarkup {
 	var row []map[string]string
 
 	for _, button := range i.buttons {
@@ -263,6 +267,23 @@ func (i *InlineMenu[User]) getInlineKeyboardMarkup(language *Language) *structs.
 		row, i.maxButtonPerRow, i.buttonFormation)
 }
 
+// GetReplyText returns the reply text.
+func (i *InlineMenu[User]) GetReplyText(language *Language) string {
+	if language != nil {
+		translatedText, err := language.Get(i.replyText)
+		if err == nil {
+			return translatedText
+		}
+	}
+
+	return i.replyText
+}
+
+// GetReplyWithFunc returns the reply with func.
+func (i *InlineMenu[User]) GetReplyWithFunc() func(*tgbotapi.TelegramBot, *CallbackUpdate[User]) {
+	return i.replyWithFunc
+}
+
 // getButtonAlertByCommand returns the action alert by command.
 func (i *InlineMenu[User]) getButtonAlertByButton(btn string) *buttonAlert {
 	for key := range i.buttonAlerts {
@@ -287,4 +308,12 @@ func (i *InlineMenu[User]) getInlineMenuByButton(btn string) *buttonInlineMenu {
 	}
 
 	return nil
+}
+
+// getMiddlewares returns the middlewares.
+func (i *InlineMenu[User]) getMiddlewares() []func(bot *tgbotapi.TelegramBot, update *CallbackUpdate[User]) bool {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
+	return i.middlewares
 }

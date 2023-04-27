@@ -129,7 +129,7 @@ func (e *EngineWithPrivateStateHandlers[User]) canProcess(update tgbotapi.Update
 	return false
 }
 
-func (e *EngineWithPrivateStateHandlers[User]) process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
+func (e *EngineWithPrivateStateHandlers[User]) Process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
 	user, userState, err := e.processUserState(update)
 	if err != nil {
 		e.onErr(client, update, err)
@@ -375,7 +375,7 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineHandler(
 
 	from := update.Update.From()
 
-	markup := menu.getInlineKeyboardMarkup(update.language)
+	markup := menu.GetInlineKeyboardMarkup(update.language)
 
 	if menu.replyText != "" {
 		var cfg tgbotapi.Config
