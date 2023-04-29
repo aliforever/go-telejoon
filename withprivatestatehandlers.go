@@ -334,18 +334,19 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 	userID int64, handler *StaticMenu[User], client *tgbotapi.TelegramBot, update *StateUpdate[User]) {
 
 	for _, middleware := range handler.middlewares {
-		if nextState, ok := middleware(client, update); !ok {
-			if nextState != "" {
-				if err := e.userRepository.SetState(userID, nextState); err != nil {
-					e.onErr(client, update.Update,
-						fmt.Errorf("error_setting_user_state: %d, %w", userID, err))
-					return
-				}
+		if target, ok := middleware(client, update); !ok {
+			var kind string
+			if target != "" {
+				kind, target = e.parseTarget(target)
 
-				err := e.switchState(userID, nextState, client, update)
-				if err != nil {
-					e.onErr(client, update.Update, err)
-					return
+				if kind == targetMenu {
+					if err := e.switchState(userID, target, client, update); err != nil {
+						e.onErr(client, update.Update, err)
+					}
+				} else if kind == targetInline {
+					if err := e.processInlineHandler(target, client, update, false); err != nil {
+						e.onErr(client, update.Update, err)
+					}
 				}
 			}
 
