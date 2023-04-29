@@ -171,10 +171,19 @@ func (e *EngineWithPrivateStateHandlers[User]) Process(client *tgbotapi.Telegram
 	su.language = lang
 
 	for _, f := range e.middlewares {
-		if nextState, ok := f(client, su); !ok {
-			if nextState != "" {
-				if err := e.switchState(from.Id, nextState, client, su); err != nil {
-					e.onErr(client, update, err)
+		if target, ok := f(client, su); !ok {
+			var kind string
+
+			if target != "" {
+				kind, target = e.parseTarget(target)
+				if kind == targetMenu {
+					if err := e.switchState(from.Id, target, client, su); err != nil {
+						e.onErr(client, update, err)
+					}
+				} else if kind == targetInline {
+					if err := e.processInlineHandler(target, client, su, false); err != nil {
+						e.onErr(client, update, err)
+					}
 				}
 			}
 			return
@@ -243,6 +252,17 @@ func (e *EngineWithPrivateStateHandlers[User]) canProcess(update tgbotapi.Update
 	}
 
 	return false
+}
+
+func (e *EngineWithPrivateStateHandlers[User]) parseTarget(data string) (string, string) {
+	target := targetMenu
+
+	split := strings.Split(data, ".")
+	if len(split) != 2 {
+		return target, split[0]
+	}
+
+	return split[0], split[1]
 }
 
 func (e *EngineWithPrivateStateHandlers[User]) processCallbackQuery(
