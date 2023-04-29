@@ -19,6 +19,8 @@ github.com/aliforever/go-telegram-bot-api v0.2.10 h1:fhLvISySYRRF2n6dF2RKJyMLmuD
 github.com/aliforever/go-telegram-bot-api v0.2.10/go.mod h1:MtlIWawW8t/oNaX+an1QDh8gAIzSrNV6cP8x2BMBq8Y=
 github.com/aliforever/go-telegram-bot-api v0.2.11 h1:b5LheoDbgfEoQytUYQ5dGDxCsOUCHNYa9RJUF/kvHy8=
 github.com/aliforever/go-telegram-bot-api v0.2.11/go.mod h1:MtlIWawW8t/oNaX+an1QDh8gAIzSrNV6cP8x2BMBq8Y=
+github.com/aliforever/go-telegram-bot-api v0.2.12 h1:RVEdDOEtF455PdUazd9K2i51aFvSHf9nbcQPkjupQfI=
+github.com/aliforever/go-telegram-bot-api v0.2.12/go.mod h1:MtlIWawW8t/oNaX+an1QDh8gAIzSrNV6cP8x2BMBq8Y=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/go-resty/resty/v2 v2.7.0 h1:me+K9p3uhSmXtrBZ4k9jcEAfJmuC8IivWHwaLZwPrFY=

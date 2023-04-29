@@ -59,15 +59,11 @@ func TestStart(t *testing.T) {
 	languageConfig := telejoon.NewLanguageConfig(languages, telejoon.NewDefaultUserLanguageRepository()).
 		WithChangeLanguageMenu("ChangeLanguage", true)
 
-	actionBuilder := telejoon.NewActionBuilder().
-		AddStateButtonT("Welcome.ChangeLanguageBtn", "ChangeLanguage").
-		AddTextButton("Hello", "You said Hello").
-		AddStateButton("Info State", "Info").
-		AddInlineMenuButton("Info", "Info")
+	defaultUserRepo := telejoon.NewDefaultUserRepository[ExampleUser]()
 
 	type args struct {
 		client    *tgbotapi.TelegramBot
-		processor telejoon.Processor
+		processor func() *telejoon.EngineWithPrivateStateHandlers[ExampleUser]
 		context   context.Context
 	}
 	tests := []struct {
@@ -78,74 +74,81 @@ func TestStart(t *testing.T) {
 			name: "TestStart",
 			args: args{
 				client: client1,
-
-				processor: telejoon.WithPrivateStateHandlers[ExampleUser](
-					telejoon.NewDefaultUserRepository[ExampleUser](),
-					"Welcome",
-					telejoon.NewOptions().SetErrorGroupID(81997375)).
-					WithLanguageConfig(languageConfig).
-					AddStaticMenu("Welcome",
-						telejoon.NewStaticMenu[ExampleUser]().
-							AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (string, bool) {
-								update.Set("name", "Ali")
-
-								return "", true
-							}).
-							WithStaticActionBuilder(actionBuilder).
-							WithDynamicHandlers(telejoon.NewDynamicHandlers[ExampleUser]().
-								WithTextHandler(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (string, bool) {
-									fmt.Println("name is:", update.Get("name"))
-									if update.Update.From() != nil && update.Update.From().Id == 81997375 {
-										actionBuilder.AddTextButton("This is meant for Error", "You said Hello Bro")
-									}
-									if update.Update.Message.Text == "Hello Bro" {
-										client.Send(client.Message().SetChatId(update.User.Id).
-											SetText("Hello Bro!"))
-										fmt.Println("update inside dynamic text handler", update)
-
-										fmt.Println("changing name to:", "Ali 2")
-										update.Set("name", "Ali 2")
-
-										return "", false
-									}
+				processor: func() *telejoon.EngineWithPrivateStateHandlers[ExampleUser] {
+					return telejoon.WithPrivateStateHandlers[ExampleUser](
+						defaultUserRepo,
+						"Welcome",
+						telejoon.NewOptions().SetErrorGroupID(81997375)).
+						WithLanguageConfig(languageConfig).
+						AddStaticMenu("Welcome",
+							telejoon.NewStaticMenu[ExampleUser]().
+								AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (string, bool) {
+									update.Set("name", "Ali")
 
 									return "", true
-								})).
-							ReplyWithLanguageKey("Welcome.Main")).
-					// AddStaticMenu("Info",
-					// 	telejoon.NewStaticMenu[ExampleUser]().
-					// 		AddButtonState("Back", "Welcome").
-					// 		ReplyWithText("This is Info Menu!").
-					// 		ReplyWithFunc(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) {
-					// 			client.Send(client.Message().
-					// 				SetText("replied with func").
-					// 				SetChatId(update.User.Id))
-					// 		})).
-					AddStaticMenu("Info", telejoon.NewStaticMenu[ExampleUser]().
-						WithStaticActionBuilder(telejoon.NewActionBuilder().
-							AddStateButtonT("Global.Back", "Welcome")).
-						ReplyWithLanguageKey("Info.Hello")).
-					AddInlineMenu("Info", telejoon.NewInlineMenu[ExampleUser]().
-						AddButtonUrl("Google", "https://google.com").
-						AddLanguageKeyDataButtonAlert("Info.Hello", "say_hello_0", "Hello Friend", false).
-						AddDataButtonAlert("Hello", "say_hello", "Hello Friend", false).
-						AddDataButtonAlert("Hello 2", "say_hello_2", "Hello Friend 2", false).
-						AddDataButtonAlert("Hello 3", "say_hello_3", "Hello Friend 3", true).
-						AddButtonInlineMenu("Change Menu to Info 2", "Info2", true).
-						SetMaxButtonPerRow(3).
-						// SetButtonFormation(1, 3).
-						AddReplyText("Info Inline Menu")).
-					AddInlineMenu("Info2", telejoon.NewInlineMenu[ExampleUser]().
-						AddDataButtonAlert("Hello", "say_hello", "Hello Friend", false).
-						AddButtonInlineMenu("Back", "Info", true).
-						AddReplyText("Info2 Inline Menu")),
+								}).
+								WithStaticActionBuilder(telejoon.NewActionBuilder().
+									AddStateButtonT("Welcome.ChangeLanguageBtn", "ChangeLanguage").
+									AddTextButton("Hello", "You said Hello").
+									AddStateButton("Info State", "Info").
+									AddInlineMenuButton("Info", "Info")).
+								WithDynamicHandlers(telejoon.NewDynamicHandlers[ExampleUser]().
+									WithTextHandler(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (string, bool) {
+										if update.Update.Message.Text == "Hello Bro" {
+											client.Send(client.Message().SetChatId(update.User.Id).
+												SetText("Hello Bro!"))
+											fmt.Println("update inside dynamic text handler", update)
+
+											fmt.Println("changing name to:", "Ali 2")
+											update.Set("name", "Ali 2")
+
+											return "", false
+										}
+
+										return "", true
+									})).
+								ReplyWithLanguageKey("Welcome.Main")).
+						AddStaticMenu("Info", telejoon.NewStaticMenu[ExampleUser]().
+							WithStaticActionBuilder(telejoon.NewActionBuilder().
+								AddStateButtonT("Global.Back", "Welcome")).
+							ReplyWithLanguageKey("Info.Hello")).
+						AddInlineMenu("Info", telejoon.NewInlineMenu[ExampleUser]().
+							WithInlineActionBuilder(telejoon.NewInlineActionBuilder().
+								AddUrlButton("Google", "https://google.com").
+								AddAlertButtonT("Info.Hello", "say_hello_0", "HI!").
+								AddAlertButton("Hello", "say_hello", "Hello Friend").
+								AddAlertButton("Hello 2", "say_hello_2", "Hello Friend 2").
+								AddAlertButton("Hello 3", "say_hello_3", "Hello Friend 3").
+								AddCallbackButton("Callback 1", "callback_1:data").
+								AddCallbackButton("Callback 2", "callback_1:data2").
+								AddInlineMenuButtonWithEdit("Change Menu to Info 2", "Info2").
+								SetMaxButtonPerRow(3)).
+							WithReplyText("Info Inline Menu")).
+						AddInlineMenu("Info2", telejoon.NewInlineMenu[ExampleUser]().
+							WithInlineActionBuilder(telejoon.NewInlineActionBuilder().
+								AddAlertButtonWithDialog("Hello", "say_hello_4", "Hello Friend").
+								AddInlineMenuButtonWithEdit("Back", "Info")).
+							WithReplyText("Info2 Inline Menu")).
+						AddCallbackQueryHandler("callback_1", func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser], args ...string) {
+							text := "Callback 1 Clicked"
+							if len(args) > 0 {
+								text = fmt.Sprintf("Callback 1 Clicked with args: %s", args[0])
+							}
+							client.Send(client.AnswerCallbackQuery().
+								SetCallbackQueryId(update.Update.CallbackQuery.Id).
+								SetText(text))
+							return
+						})
+				},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			telejoon.Start(tt.args.client, tt.args.processor)
+			for update := range tt.args.client.Updates() {
+				tt.args.processor().Process(tt.args.client, update)
+			}
 		})
 	}
 
