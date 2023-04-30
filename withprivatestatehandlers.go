@@ -172,18 +172,9 @@ func (e *EngineWithPrivateStateHandlers[User]) Process(client *tgbotapi.Telegram
 
 	for _, f := range e.middlewares {
 		if target, ok := f(client, su); !ok {
-			var kind string
-
 			if target != "" {
-				kind, target = e.parseTarget(target)
-				if kind == targetMenu {
-					if err := e.switchState(from.Id, target, client, su); err != nil {
-						e.onErr(client, update, err)
-					}
-				} else if kind == targetInline {
-					if err := e.processInlineHandler(target, client, su, false); err != nil {
-						e.onErr(client, update, err)
-					}
+				if err := e.switchState(from.Id, target, client, su); err != nil {
+					e.onErr(client, update, err)
 				}
 			}
 			return
@@ -215,6 +206,12 @@ func (e *EngineWithPrivateStateHandlers[User]) AddCallbackQueryHandler(
 	return e
 }
 
+func (e *EngineWithPrivateStateHandlers[User]) SwitchState(
+	userID int64, client *tgbotapi.TelegramBot, update *StateUpdate[User], state string) error {
+
+	return e.switchState(userID, state, client, update)
+}
+
 func (e *EngineWithPrivateStateHandlers[User]) SwitchUserState(
 	client *tgbotapi.TelegramBot, userID int64, state string) error {
 
@@ -230,6 +227,12 @@ func (e *EngineWithPrivateStateHandlers[User]) SwitchUserState(
 		language:   lang,
 		IsSwitched: true,
 	})
+}
+
+func (e *EngineWithPrivateStateHandlers[User]) SendInlineMenu(
+	client *tgbotapi.TelegramBot, update *StateUpdate[User], menu string, shouldEdit bool) error {
+
+	return e.processInlineHandler(menu, client, update, shouldEdit)
 }
 
 // getCallbackQueryHandler returns a callback query handler by data
@@ -252,17 +255,6 @@ func (e *EngineWithPrivateStateHandlers[User]) canProcess(update tgbotapi.Update
 	}
 
 	return false
-}
-
-func (e *EngineWithPrivateStateHandlers[User]) parseTarget(data string) (string, string) {
-	target := targetMenu
-
-	split := strings.Split(data, ".")
-	if len(split) != 2 {
-		return target, split[0]
-	}
-
-	return split[0], split[1]
 }
 
 func (e *EngineWithPrivateStateHandlers[User]) processCallbackQuery(
@@ -335,18 +327,9 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 
 	for _, middleware := range handler.middlewares {
 		if target, ok := middleware(client, update); !ok {
-			var kind string
 			if target != "" {
-				kind, target = e.parseTarget(target)
-
-				if kind == targetMenu {
-					if err := e.switchState(userID, target, client, update); err != nil {
-						e.onErr(client, update.Update, err)
-					}
-				} else if kind == targetInline {
-					if err := e.processInlineHandler(target, client, update, false); err != nil {
-						e.onErr(client, update.Update, err)
-					}
+				if err := e.switchState(userID, target, client, update); err != nil {
+					e.onErr(client, update.Update, err)
 				}
 			}
 
