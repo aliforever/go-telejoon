@@ -462,10 +462,6 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineHandler(
 		return fmt.Errorf("inline_menu_not_found: %s", menuName)
 	}
 
-	if menu.inlineActionBuilder == nil {
-		return fmt.Errorf("inline_menu_action_builder_not_set: %s", menuName)
-	}
-
 	from := update.Update.From()
 
 	if middlewares := menu.getMiddlewares(); len(middlewares) > 0 {
@@ -474,6 +470,10 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineHandler(
 				return nil
 			}
 		}
+	}
+
+	if menu.inlineActionBuilder == nil {
+		return fmt.Errorf("inline_menu_action_builder_not_set: %s", menuName)
 	}
 
 	markup := menu.inlineActionBuilder.buildButtons(update.language)
