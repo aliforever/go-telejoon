@@ -269,16 +269,10 @@ func (e *EngineWithPrivateStateHandlers[User]) processCallbackQuery(
 
 	command := data[0]
 
-	menu, handler, err := e.getHandlerByAction(command)
+	handler, err := e.getHandlerByAction(client, update, command)
 	if err != nil {
 		e.onErr(client, update.Update, err)
 		return
-	}
-
-	for _, f := range menu.middlewares {
-		if !f(client, update) {
-			return
-		}
 	}
 
 	switch btn := handler.(type) {
@@ -561,10 +555,16 @@ func (e *EngineWithPrivateStateHandlers[User]) userInfo(userID int64) (User, *La
 }
 
 // getHandlerByAction returns inline menu by action
-func (e *EngineWithPrivateStateHandlers[User]) getHandlerByAction(action string) (
-	*InlineMenu[User], InlineAction, error) {
+func (e *EngineWithPrivateStateHandlers[User]) getHandlerByAction(
+	client *tgbotapi.TelegramBot, update *StateUpdate[User], action string) (InlineAction, error) {
 
 	for _, menu := range e.inlineMenus {
+		for _, f := range menu.middlewares {
+			if !f(client, update) {
+				return nil, nil
+			}
+		}
+
 		if menu.inlineActionBuilder == nil {
 			continue
 		}
@@ -575,9 +575,9 @@ func (e *EngineWithPrivateStateHandlers[User]) getHandlerByAction(action string)
 		}
 
 		if handler, ok := handlers[action]; ok {
-			return menu, handler, nil
+			return handler, nil
 		}
 	}
 
-	return nil, nil, fmt.Errorf("handler_for_action_not_found: %s", action)
+	return nil, fmt.Errorf("handler_for_action_not_found: %s", action)
 }
