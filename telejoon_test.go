@@ -121,13 +121,13 @@ func TestStart(t *testing.T) {
 								AddAlertButton("Hello 3", "say_hello_3", "Hello Friend 3").
 								AddCallbackButton("Callback 1", "callback_1:data").
 								AddCallbackButton("Callback 2", "callback_1:data2").
-								AddInlineMenuButtonWithEdit("Change Menu to Info 2", "Info2").
+								AddInlineMenuButtonWithEdit("Change Menu to Info 2", "Info2", "Info2").
 								SetMaxButtonPerRow(3)).
 							WithReplyText("Info Inline Menu")).
 						AddInlineMenu("Info2", telejoon.NewInlineMenu[ExampleUser]().
 							WithInlineActionBuilder(telejoon.NewInlineActionBuilder().
 								AddAlertButtonWithDialog("Hello", "say_hello_4", "Hello Friend").
-								AddInlineMenuButtonWithEdit("Back", "Info")).
+								AddInlineMenuButtonWithEdit("Back", "Info", "Info")).
 							WithReplyText("Info2 Inline Menu")).
 						AddCallbackQueryHandler("callback_1", func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser], args ...string) {
 							text := "Callback 1 Clicked"

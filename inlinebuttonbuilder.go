@@ -17,101 +17,64 @@ const (
 	InlineActionKindCallback   InlineActionKind = "CALLBACK"
 )
 
-type inlineUrlButton struct {
-	baseButton
+type baseInlineButton struct {
+	button string
+	data   string
 
-	address string
+	options []*ButtonOptions
 }
 
-func (t inlineUrlButton) Name() string {
+// Button returns the button
+func (t baseInlineButton) Button() string {
 	return t.button
 }
 
-func (t inlineUrlButton) Kind() InlineActionKind {
-	return InlineActionKindUrl
+// Data returns the data
+func (t baseInlineButton) Data() string {
+	return t.data
 }
 
-func (t inlineUrlButton) Result() string {
-	return t.address
+// Options returns the options
+func (t baseInlineButton) Options() *ButtonOptions {
+	if len(t.options) == 0 {
+		return nil
+	}
+
+	return t.options[0]
+}
+
+type inlineUrlButton struct {
+	baseInlineButton
 }
 
 type inlineInlineMenuButton struct {
-	baseButton
+	baseInlineButton
 
-	menuName string
-}
-
-func (t inlineInlineMenuButton) Name() string {
-	return t.button
-}
-
-func (t inlineInlineMenuButton) Kind() InlineActionKind {
-	return InlineActionKindInlineMenu
-}
-
-func (t inlineInlineMenuButton) Result() string {
-	return t.menuName
+	menu string
+	edit bool
 }
 
 type inlineAlertButton struct {
-	baseButton
+	baseInlineButton
 
 	text      string
 	showAlert bool
 }
 
-func (t inlineAlertButton) Name() string {
-	return t.button
-}
-
-func (t inlineAlertButton) Kind() InlineActionKind {
-	return InlineActionKindAlert
-}
-
-func (t inlineAlertButton) Result() string {
-	return t.text
-}
-
 type inlineStateButton struct {
-	baseButton
+	baseInlineButton
 
 	state string
 }
 
-func (t inlineStateButton) Name() string {
-	return t.button
-}
-
-func (t inlineStateButton) Kind() InlineActionKind {
-	return InlineActionKindState
-}
-
-func (t inlineStateButton) Result() string {
-	return t.state
-}
-
 type inlineCallbackButton struct {
-	baseButton
-
-	data string
-}
-
-func (t inlineCallbackButton) Name() string {
-	return t.button
-}
-
-func (t inlineCallbackButton) Kind() InlineActionKind {
-	return InlineActionKindCallback
-}
-
-func (t inlineCallbackButton) Result() string {
-	return t.data
+	baseInlineButton
 }
 
 type InlineAction interface {
-	Name() string
-	Kind() InlineActionKind
-	Result() string
+	Button() string
+	Data() string
+	Options() *ButtonOptions
 }
 
 type inlineActionBuilder struct {
@@ -119,17 +82,13 @@ type inlineActionBuilder struct {
 
 	buttons []InlineAction
 
-	buttonOptions map[string][]*ButtonOptions
-
 	buttonFormation []int
 	maxButtonPerRow int
 }
 
 // NewInlineActionBuilder creates a new inlineActionBuilder.
 func NewInlineActionBuilder() *inlineActionBuilder {
-	return &inlineActionBuilder{
-		buttonOptions: make(map[string][]*ButtonOptions),
-	}
+	return &inlineActionBuilder{}
 }
 
 // SetMaxButtonPerRow sets the maximum number of buttons per row.
@@ -159,15 +118,12 @@ func (b *inlineActionBuilder) AddUrlButton(
 	defer b.locker.Unlock()
 
 	b.buttons = append(b.buttons, inlineUrlButton{
-		baseButton: baseButton{
-			button: button,
+		baseInlineButton: baseInlineButton{
+			button:  button,
+			data:    address,
+			options: opts,
 		},
-		address: address,
 	})
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = opts
-	}
 
 	return b
 }
@@ -178,260 +134,242 @@ func (b *inlineActionBuilder) AddUrlButtonT(
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, inlineUrlButton{
-		baseButton: baseButton{
-			button: button,
-		},
-		address: address,
-	})
-
-	b.buttonOptions[button] = []*ButtonOptions{
+	defaultOptions := []*ButtonOptions{
 		NewButtonOptions().TranslateName(),
 	}
 
 	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
+		defaultOptions = append(defaultOptions, opts...)
 	}
+
+	b.buttons = append(b.buttons, inlineUrlButton{
+		baseInlineButton: baseInlineButton{
+			button:  button,
+			data:    address,
+			options: defaultOptions,
+		},
+	})
 
 	return b
 }
 
 func (b *inlineActionBuilder) AddInlineMenuButton(
-	button, inlineMenu string, opts ...*ButtonOptions) *inlineActionBuilder {
+	button, data, inlineMenu string, opts ...*ButtonOptions) *inlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
 	b.buttons = append(b.buttons, inlineInlineMenuButton{
-		baseButton: baseButton{
+		baseInlineButton: baseInlineButton{
 			button:  button,
+			data:    data,
 			options: opts,
 		},
-		menuName: inlineMenu,
+		menu: inlineMenu,
 	})
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = opts
-	}
 
 	return b
 }
 
 func (b *inlineActionBuilder) AddInlineMenuButtonWithEdit(
-	button, inlineMenu string, opts ...*ButtonOptions) *inlineActionBuilder {
+	button, data, inlineMenu string, opts ...*ButtonOptions) *inlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
 	b.buttons = append(b.buttons, inlineInlineMenuButton{
-		baseButton: baseButton{
+		baseInlineButton: baseInlineButton{
 			button:  button,
 			options: opts,
+			data:    data,
 		},
-		menuName: inlineMenu,
+		menu: inlineMenu,
+		edit: true,
 	})
-
-	b.buttonOptions[button] = []*ButtonOptions{
-		NewButtonOptions().ShouldEdit(),
-	}
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
-	}
 
 	return b
 }
 
 func (b *inlineActionBuilder) AddInlineMenuButtonT(
-	button, inlineMenu string, opts ...*ButtonOptions) *inlineActionBuilder {
+	button, data, inlineMenu string, opts ...*ButtonOptions) *inlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, inlineInlineMenuButton{
-		baseButton: baseButton{
-			button:  button,
-			options: opts,
-		},
-		menuName: inlineMenu,
-	})
-
-	b.buttonOptions[button] = []*ButtonOptions{
+	defaultOptions := []*ButtonOptions{
 		NewButtonOptions().TranslateName(),
 	}
 
 	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
+		defaultOptions = append(defaultOptions, opts...)
 	}
+
+	b.buttons = append(b.buttons, inlineInlineMenuButton{
+		baseInlineButton: baseInlineButton{
+			button:  button,
+			data:    data,
+			options: defaultOptions,
+		},
+		menu: inlineMenu,
+	})
 
 	return b
 }
 
 func (b *inlineActionBuilder) AddInlineMenuButtonWithEditT(
-	button, inlineMenu string, opts ...*ButtonOptions) *inlineActionBuilder {
+	button, data, inlineMenu string, opts ...*ButtonOptions) *inlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, inlineInlineMenuButton{
-		baseButton: baseButton{
-			button:  button,
-			options: opts,
-		},
-		menuName: inlineMenu,
-	})
-
-	b.buttonOptions[button] = []*ButtonOptions{
-		NewButtonOptions().TranslateName().ShouldEdit(),
+	defaultOptions := []*ButtonOptions{
+		NewButtonOptions().TranslateName(),
 	}
 
 	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
+		defaultOptions = append(defaultOptions, opts...)
 	}
+
+	b.buttons = append(b.buttons, inlineInlineMenuButton{
+		baseInlineButton: baseInlineButton{
+			button:  button,
+			options: defaultOptions,
+			data:    data,
+		},
+		menu: inlineMenu,
+		edit: true,
+	})
 
 	return b
 }
 
 func (b *inlineActionBuilder) AddAlertButton(
-	button, callbackData, alertText string, opts ...*ButtonOptions) *inlineActionBuilder {
+	button, data, alertText string, opts ...*ButtonOptions) *inlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
 	b.buttons = append(b.buttons, inlineAlertButton{
-		baseButton: baseButton{
+		baseInlineButton: baseInlineButton{
 			button:  button,
 			options: opts,
+			data:    data,
 		},
-		text: callbackData,
+		text: alertText,
 	})
-
-	btnOptions := NewButtonOptions().Alert(alertText)
-
-	b.buttonOptions[button] = []*ButtonOptions{
-		btnOptions,
-	}
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
-	}
 
 	return b
 }
 
 func (b *inlineActionBuilder) AddAlertButtonWithDialog(
-	button, callbackData, alertText string, opts ...*ButtonOptions) *inlineActionBuilder {
+	button, data, alertText string, opts ...*ButtonOptions) *inlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, inlineAlertButton{
-		baseButton: baseButton{
-			button:  button,
-			options: opts,
-		},
-		text: callbackData,
-	})
-
-	btnOptions := NewButtonOptions().Alert(alertText).ShowAlertDialog()
-
-	b.buttonOptions[button] = []*ButtonOptions{
-		btnOptions,
+	defaultOptions := []*ButtonOptions{
+		NewButtonOptions().TranslateName(),
 	}
 
 	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
+		defaultOptions = append(defaultOptions, opts...)
 	}
+
+	b.buttons = append(b.buttons, inlineAlertButton{
+		baseInlineButton: baseInlineButton{
+			button:  button,
+			options: defaultOptions,
+			data:    data,
+		},
+		text:      alertText,
+		showAlert: true,
+	})
 
 	return b
 }
 
 func (b *inlineActionBuilder) AddAlertButtonT(
-	button, callbackData, alertText string, opts ...*ButtonOptions) *inlineActionBuilder {
+	button, data, alertText string, opts ...*ButtonOptions) *inlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, inlineAlertButton{
-		baseButton: baseButton{
-			button:  button,
-			options: opts,
-		},
-		text: callbackData,
-	})
-
-	btnOptions := NewButtonOptions().TranslateName().Alert(alertText)
-
-	b.buttonOptions[button] = []*ButtonOptions{
-		btnOptions,
+	defaultOptions := []*ButtonOptions{
+		NewButtonOptions().TranslateName(),
 	}
 
 	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
+		defaultOptions = append(defaultOptions, opts...)
 	}
+
+	b.buttons = append(b.buttons, inlineAlertButton{
+		baseInlineButton: baseInlineButton{
+			button:  button,
+			options: defaultOptions,
+			data:    data,
+		},
+		text: alertText,
+	})
 
 	return b
 }
 
 func (b *inlineActionBuilder) AddAlertButtonWithDialogT(
-	button, callbackData, alertText string, opts ...*ButtonOptions) *inlineActionBuilder {
+	button, data, alertText string, opts ...*ButtonOptions) *inlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, inlineAlertButton{
-		baseButton: baseButton{
-			button:  button,
-			options: opts,
-		},
-		text: callbackData,
-	})
-
-	btnOptions := NewButtonOptions().TranslateName().Alert(alertText).ShowAlertDialog()
-
-	b.buttonOptions[button] = []*ButtonOptions{
-		btnOptions,
+	defaultOptions := []*ButtonOptions{
+		NewButtonOptions().TranslateName(),
 	}
 
 	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
+		defaultOptions = append(defaultOptions, opts...)
 	}
+
+	b.buttons = append(b.buttons, inlineAlertButton{
+		baseInlineButton: baseInlineButton{
+			button:  button,
+			options: defaultOptions,
+			data:    data,
+		},
+		text:      alertText,
+		showAlert: true,
+	})
 
 	return b
 }
 
-func (b *inlineActionBuilder) AddStateButton(button, state string, opts ...*ButtonOptions) *inlineActionBuilder {
+func (b *inlineActionBuilder) AddStateButton(button, data, state string, opts ...*ButtonOptions) *inlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
 	b.buttons = append(b.buttons, inlineStateButton{
-		baseButton: baseButton{
+		baseInlineButton: baseInlineButton{
 			button:  button,
 			options: opts,
-		}, state: state,
+			data:    data,
+		},
+		state: state,
 	})
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = opts
-	}
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
-	}
 
 	return b
 }
 
 // AddStateButtonT adds a state action to the inlineActionBuilder with name translation.
-func (b *inlineActionBuilder) AddStateButtonT(button, state string, opts ...*ButtonOptions) *inlineActionBuilder {
+func (b *inlineActionBuilder) AddStateButtonT(button, data, state string, opts ...*ButtonOptions) *inlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, inlineStateButton{
-		baseButton: baseButton{
-			button: button,
-		}, state: state,
-	})
-
-	b.buttonOptions[button] = []*ButtonOptions{
+	defaultOptions := []*ButtonOptions{
 		NewButtonOptions().TranslateName(),
 	}
 
 	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
+		defaultOptions = append(defaultOptions, opts...)
 	}
+
+	b.buttons = append(b.buttons, inlineStateButton{
+		baseInlineButton: baseInlineButton{
+			button:  button,
+			data:    data,
+			options: defaultOptions,
+		},
+		state: state,
+	})
 
 	return b
 }
@@ -441,19 +379,12 @@ func (b *inlineActionBuilder) AddCallbackButton(button, data string, opts ...*Bu
 	defer b.locker.Unlock()
 
 	b.buttons = append(b.buttons, inlineCallbackButton{
-		baseButton: baseButton{
+		baseInlineButton: baseInlineButton{
 			button:  button,
 			options: opts,
-		}, data: data,
+			data:    data,
+		},
 	})
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = opts
-	}
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
-	}
 
 	return b
 }
@@ -463,19 +394,21 @@ func (b *inlineActionBuilder) AddCallbackButtonT(button, data string, opts ...*B
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, inlineCallbackButton{
-		baseButton: baseButton{
-			button: button,
-		}, data: data,
-	})
-
-	b.buttonOptions[button] = []*ButtonOptions{
+	defaultOptions := []*ButtonOptions{
 		NewButtonOptions().TranslateName(),
 	}
 
 	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
+		defaultOptions = append(defaultOptions, opts...)
 	}
+
+	b.buttons = append(b.buttons, inlineCallbackButton{
+		baseInlineButton: baseInlineButton{
+			button:  button,
+			data:    data,
+			options: defaultOptions,
+		},
+	})
 
 	return b
 }
@@ -489,11 +422,11 @@ func (b *inlineActionBuilder) buildButtons(language *Language) *structs.InlineKe
 	var rows []map[string]string
 
 	for _, button := range b.buttons {
-		name := button.Name()
+		name := button.Button()
 
 		shouldBreakAfter := false
 
-		if opts := b.getOptionsForButton(name); opts != nil {
+		if opts := button.Options(); opts != nil {
 			if language != nil && opts.translateName {
 				btnTxt, _ := language.Get(name)
 				if btnTxt != "" {
@@ -514,10 +447,10 @@ func (b *inlineActionBuilder) buildButtons(language *Language) *structs.InlineKe
 			"text": name,
 		}
 
-		if button.Kind() == InlineActionKindUrl {
-			row["url"] = button.Result()
+		if val, ok := button.(inlineUrlButton); ok {
+			row["url"] = val.data
 		} else {
-			row["callback_data"] = button.Result()
+			row["callback_data"] = button.Data()
 		}
 
 		rows = append(rows, row)
@@ -530,17 +463,6 @@ func (b *inlineActionBuilder) buildButtons(language *Language) *structs.InlineKe
 	return tools.Keyboards{}.NewInlineKeyboardFromSlicesOfMapWithFormation(rows, b.maxButtonPerRow, b.buttonFormation)
 }
 
-func (b *inlineActionBuilder) getOptionsForButton(button string) *ButtonOptions {
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	if opts := b.buttonOptions[button]; len(opts) == 0 {
-		return nil
-	}
-
-	return b.buttonOptions[button][0]
-}
-
 func (b *inlineActionBuilder) getByCallbackActionData() map[string]InlineAction {
 	b.locker.Lock()
 	defer b.locker.Unlock()
@@ -548,8 +470,8 @@ func (b *inlineActionBuilder) getByCallbackActionData() map[string]InlineAction 
 	var data = make(map[string]InlineAction)
 
 	for _, button := range b.buttons {
-		if button.Kind() != InlineActionKindUrl {
-			sp := strings.Split(button.Result(), ":")
+		if _, ok := button.(inlineUrlButton); !ok {
+			sp := strings.Split(button.Data(), ":")
 			data[sp[0]] = button
 		}
 	}

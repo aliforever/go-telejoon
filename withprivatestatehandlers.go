@@ -1,6 +1,7 @@
 package telejoon
 
 import (
+	"errors"
 	"fmt"
 	tgbotapi "github.com/aliforever/go-telegram-bot-api"
 	"github.com/aliforever/go-telegram-bot-api/structs"
@@ -274,51 +275,46 @@ func (e *EngineWithPrivateStateHandlers[User]) processCallbackQuery(
 		return
 	}
 
-	if handler.Kind() == InlineActionKindAlert {
-		if opt := menu.inlineActionBuilder.getOptionsForButton(handler.Name()); opt != nil {
-			if opt.alert != "" {
-				cfg := client.AnswerCallbackQuery().
-					SetCallbackQueryId(update.Update.CallbackQuery.Id).
-					SetText(opt.alert).
-					SetShowAlert(opt.showAlertDialog)
-				_, err := client.Send(cfg)
-				if err != nil {
-					e.onErr(client, update.Update, err)
-					return
-				}
-			}
+	for _, f := range menu.middlewares {
+		if !f(client, update) {
+			return
+		}
+	}
+
+	switch btn := handler.(type) {
+	case inlineAlertButton:
+		cfg := client.AnswerCallbackQuery().
+			SetCallbackQueryId(update.Update.CallbackQuery.Id).
+			SetText(btn.text).
+			SetShowAlert(btn.showAlert)
+		_, err := client.Send(cfg)
+		if err != nil {
+			e.onErr(client, update.Update, err)
+			return
 		}
 
 		return
-	}
-
-	if handler.Kind() == InlineActionKindState {
-		if err := e.switchState(update.Update.From().Id, handler.Result(), client, update); err != nil {
+	case inlineStateButton:
+		if err := e.switchState(update.Update.From().Id, btn.state, client, update); err != nil {
 			// TODO: Implement Switch With Edit Message
 			e.onErr(client, update.Update, err)
 		}
 
 		return
-	}
-
-	if handler.Kind() == InlineActionKindInlineMenu {
-		shouldEdit := false
-
-		if opt := menu.inlineActionBuilder.getOptionsForButton(handler.Name()); opt != nil {
-			shouldEdit = opt.shouldEdit
-		}
-
-		if err := e.processInlineHandler(handler.Result(), client, update, shouldEdit); err != nil {
+	case inlineInlineMenuButton:
+		if err := e.processInlineHandler(btn.menu, client, update, btn.edit); err != nil {
 			e.onErr(client, update.Update, err)
 		}
 
 		return
-	}
-
-	if handler.Kind() == InlineActionKindCallback {
+	case inlineCallbackButton:
 		if callbackHandler := e.getCallbackQueryHandler(command); callbackHandler != nil {
 			callbackHandler(client, update, data[1:]...)
+		} else {
+			e.onErr(client, update.Update, errors.New("callback query handler not found"))
 		}
+
+		return
 	}
 }
 
