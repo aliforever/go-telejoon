@@ -129,7 +129,7 @@ func TestStart(t *testing.T) {
 								AddAlertButtonWithDialog("Hello", "say_hello_4", "Hello Friend").
 								AddInlineMenuButtonWithEdit("Back", "Info", "Info")).
 							WithReplyText("Info2 Inline Menu")).
-						AddCallbackQueryHandler("callback_1", func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser], args ...string) {
+						AddCallbackQueryHandler("callback_1", func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser], args ...string) error {
 							text := "Callback 1 Clicked"
 							if len(args) > 0 {
 								text = fmt.Sprintf("Callback 1 Clicked with args: %s", args[0])
@@ -137,7 +137,7 @@ func TestStart(t *testing.T) {
 							client.Send(client.AnswerCallbackQuery().
 								SetCallbackQueryId(update.Update.CallbackQuery.Id).
 								SetText(text))
-							return
+							return nil
 						})
 				},
 			},

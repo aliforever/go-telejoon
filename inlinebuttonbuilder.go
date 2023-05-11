@@ -1,6 +1,7 @@
 package telejoon
 
 import (
+	"fmt"
 	"github.com/aliforever/go-telegram-bot-api/structs"
 	"github.com/aliforever/go-telegram-bot-api/tools"
 	"strings"
@@ -79,6 +80,8 @@ type InlineAction interface {
 
 type inlineActionBuilder struct {
 	locker sync.Mutex
+
+	inlineMenu string
 
 	buttons []InlineAction
 
@@ -450,7 +453,7 @@ func (b *inlineActionBuilder) buildButtons(language *Language) *structs.InlineKe
 		if val, ok := button.(inlineUrlButton); ok {
 			row["url"] = val.data
 		} else {
-			row["callback_data"] = button.Data()
+			row["callback_data"] = fmt.Sprintf("%s:%s", b.inlineMenu, button.Data())
 		}
 
 		rows = append(rows, row)

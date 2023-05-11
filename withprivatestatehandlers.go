@@ -24,7 +24,7 @@ type EngineWithPrivateStateHandlers[User any] struct {
 
 	inlineMenus map[string]*InlineMenu[User]
 
-	callbackQueryHandlers map[string]func(client *tgbotapi.TelegramBot, update *StateUpdate[User], args ...string)
+	callbackQueryHandlers map[string]func(client *tgbotapi.TelegramBot, update *StateUpdate[User], args ...string) error
 
 	languageConfig *LanguageConfig
 }
@@ -40,7 +40,7 @@ func WithPrivateStateHandlers[User any](
 		defaultStateName:      defaultState,
 		staticMenus:           map[string]*StaticMenu[User]{},
 		inlineMenus:           map[string]*InlineMenu[User]{},
-		callbackQueryHandlers: map[string]func(*tgbotapi.TelegramBot, *StateUpdate[User], ...string){},
+		callbackQueryHandlers: map[string]func(*tgbotapi.TelegramBot, *StateUpdate[User], ...string) error{},
 	}
 }
 
@@ -73,6 +73,11 @@ func (e *EngineWithPrivateStateHandlers[User]) AddInlineMenu(
 
 	e.m.Lock()
 	defer e.m.Unlock()
+
+	handler.callbackPrefix = name
+	if handler.inlineActionBuilder != nil {
+		handler.inlineActionBuilder.inlineMenu = name
+	}
 
 	e.inlineMenus[name] = handler
 
@@ -197,7 +202,8 @@ func (e *EngineWithPrivateStateHandlers[User]) Process(client *tgbotapi.Telegram
 
 // AddCallbackQueryHandler adds a callback query handler
 func (e *EngineWithPrivateStateHandlers[User]) AddCallbackQueryHandler(
-	data string, fn func(*tgbotapi.TelegramBot, *StateUpdate[User], ...string)) *EngineWithPrivateStateHandlers[User] {
+	data string,
+	fn func(*tgbotapi.TelegramBot, *StateUpdate[User], ...string) error) *EngineWithPrivateStateHandlers[User] {
 
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -238,7 +244,7 @@ func (e *EngineWithPrivateStateHandlers[User]) SendInlineMenu(
 
 // getCallbackQueryHandler returns a callback query handler by data
 func (e *EngineWithPrivateStateHandlers[User]) getCallbackQueryHandler(
-	data string) func(*tgbotapi.TelegramBot, *StateUpdate[User], ...string) {
+	data string) func(*tgbotapi.TelegramBot, *StateUpdate[User], ...string) error {
 
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -267,45 +273,27 @@ func (e *EngineWithPrivateStateHandlers[User]) processCallbackQuery(
 
 	data := strings.Split(update.Update.CallbackQuery.Data, ":")
 
-	command := data[0]
+	menu := data[0]
 
-	handler, err := e.getHandlerByAction(client, update, command)
-	if err != nil {
-		e.onErr(client, update.Update, err)
-		return
-	}
-
-	switch btn := handler.(type) {
-	case inlineAlertButton:
-		cfg := client.AnswerCallbackQuery().
-			SetCallbackQueryId(update.Update.CallbackQuery.Id).
-			SetText(btn.text).
-			SetShowAlert(btn.showAlert)
-		_, err := client.Send(cfg)
-		if err != nil {
-			e.onErr(client, update.Update, err)
-			return
-		}
-
-		return
-	case inlineStateButton:
-		if err := e.switchState(update.Update.From().Id, btn.state, client, update); err != nil {
-			// TODO: Implement Switch With Edit Message
-			e.onErr(client, update.Update, err)
-		}
-
-		return
-	case inlineInlineMenuButton:
-		if err := e.processInlineHandler(btn.menu, client, update, btn.edit); err != nil {
-			e.onErr(client, update.Update, err)
-		}
-
-		return
-	case inlineCallbackButton:
-		if callbackHandler := e.getCallbackQueryHandler(command); callbackHandler != nil {
-			callbackHandler(client, update, data[1:]...)
+	if inlineMenu, ok := e.inlineMenus[menu]; !ok {
+		if callbackHandler := e.getCallbackQueryHandler(data[0]); callbackHandler != nil {
+			err := callbackHandler(client, update, data[1:]...)
+			if err != nil {
+				e.onErr(client, update.Update, err)
+			}
 		} else {
-			e.onErr(client, update.Update, errors.New("callback query handler not found"))
+			e.onErr(client, update.Update, errors.New("callback query handler not found: "+data[0]))
+		}
+		return
+	} else {
+		for _, f := range inlineMenu.middlewares {
+			if !f(client, update) {
+				return
+			}
+		}
+
+		if err := e.processInlineCallbackHandler(client, update, inlineMenu, data[1:]); err != nil {
+			e.onErr(client, update.Update, errors.New("error processing inline menu: "+err.Error()))
 		}
 
 		return
@@ -580,4 +568,51 @@ func (e *EngineWithPrivateStateHandlers[User]) getHandlerByAction(
 	}
 
 	return nil, fmt.Errorf("handler_for_action_not_found: %s", action)
+}
+
+// getHandlerByAction returns inline menu by action
+func (e *EngineWithPrivateStateHandlers[User]) processInlineCallbackHandler(
+	client *tgbotapi.TelegramBot, update *StateUpdate[User], menu *InlineMenu[User], data []string) error {
+
+	for _, f := range menu.middlewares {
+		if !f(client, update) {
+			return nil
+		}
+	}
+
+	actionHandlers := menu.inlineActionBuilder.getByCallbackActionData()
+
+	if actionHandlers == nil {
+		return fmt.Errorf("inline_menu_action_builder_not_set: %s", menu.callbackPrefix)
+	}
+
+	if handler, ok := actionHandlers[data[0]]; !ok {
+		return fmt.Errorf("handler_for_action_not_found: %s", data[0])
+	} else {
+		switch btn := handler.(type) {
+		case inlineAlertButton:
+			cfg := client.AnswerCallbackQuery().
+				SetCallbackQueryId(update.Update.CallbackQuery.Id).
+				SetText(btn.text).
+				SetShowAlert(btn.showAlert)
+			_, err := client.Send(cfg)
+
+			return err
+		case inlineStateButton:
+			// TODO: Implement Switch With Edit Message
+
+			return e.switchState(update.Update.From().Id, btn.state, client, update)
+		case inlineInlineMenuButton:
+			return e.processInlineHandler(btn.menu, client, update, btn.edit)
+		case inlineCallbackButton:
+			if callbackHandler := e.getCallbackQueryHandler(data[0]); callbackHandler != nil {
+				callbackHandler(client, update, data[1:]...)
+				return nil
+			}
+
+			return errors.New("callback query handler not found")
+		}
+	}
+
+	return errors.New("processor_for_action_not_found")
 }

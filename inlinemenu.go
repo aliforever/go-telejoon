@@ -10,6 +10,8 @@ type InlineMenu[User any] struct {
 
 	replyText string
 
+	callbackPrefix string
+
 	inlineActionBuilder *inlineActionBuilder
 
 	middlewares []func(*tgbotapi.TelegramBot, *StateUpdate[User]) bool
