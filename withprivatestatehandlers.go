@@ -606,8 +606,7 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineCallbackHandler(
 			return e.processInlineHandler(btn.menu, client, update, btn.edit)
 		case inlineCallbackButton:
 			if callbackHandler := e.getCallbackQueryHandler(data[0]); callbackHandler != nil {
-				callbackHandler(client, update, data[1:]...)
-				return nil
+				return callbackHandler(client, update, data[1:]...)
 			}
 
 			return errors.New("callback query handler not found")
