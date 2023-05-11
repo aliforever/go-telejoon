@@ -46,6 +46,7 @@ func (i *InlineMenu[User]) WithInlineActionBuilder(
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
+	builder.inlineMenu = i.callbackPrefix
 	i.inlineActionBuilder = builder
 
 	return i
