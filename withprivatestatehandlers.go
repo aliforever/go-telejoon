@@ -499,6 +499,10 @@ func (e *EngineWithPrivateStateHandlers[User]) switchState(
 func (e *EngineWithPrivateStateHandlers[User]) processUserState(update tgbotapi.Update) (User, string, error) {
 	from := update.From()
 
+	if from == nil {
+		return *new(User), "", errors.New("empty_from")
+	}
+
 	user, err := e.userRepository.Find(from.Id)
 	if err != nil {
 		user, err = e.userRepository.Store(from)
