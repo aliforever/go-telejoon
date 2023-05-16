@@ -74,3 +74,30 @@ func (i *InlineMenu[User]) getMiddlewares() []func(bot *tgbotapi.TelegramBot, up
 
 	return i.middlewares
 }
+
+func (i *InlineMenu[User]) getActionBuilder() *InlineActionBuilder {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
+	if i.inlineActionBuilder == nil {
+		return nil
+	}
+
+	i.inlineActionBuilder.inlineMenu = i.callbackPrefix
+
+	return i.inlineActionBuilder
+}
+
+func (i *InlineMenu[User]) getDeferredActionBuilder(update *StateUpdate[User]) *InlineActionBuilder {
+	i.lock.Lock()
+	defer i.lock.Unlock()
+
+	if i.deferredActionBuilder == nil {
+		return nil
+	}
+
+	builder := i.deferredActionBuilder(update)
+	builder.inlineMenu = i.callbackPrefix
+
+	return builder
+}

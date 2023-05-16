@@ -75,9 +75,6 @@ func (e *EngineWithPrivateStateHandlers[User]) AddInlineMenu(
 	defer e.m.Unlock()
 
 	handler.callbackPrefix = name
-	if handler.inlineActionBuilder != nil {
-		handler.inlineActionBuilder.inlineMenu = name
-	}
 
 	e.inlineMenus[name] = handler
 
@@ -444,16 +441,16 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineHandler(
 		}
 	}
 
-	if menu.inlineActionBuilder == nil && menu.deferredActionBuilder == nil {
+	menuActionBuilder := menu.getDeferredActionBuilder(update)
+	if menuActionBuilder == nil {
+		menuActionBuilder = menu.getActionBuilder()
+	}
+
+	if menuActionBuilder == nil {
 		return fmt.Errorf("inline_menu_action_builder_not_set: %s", menuName)
 	}
 
-	actionBuilder := menu.inlineActionBuilder
-	if menu.deferredActionBuilder != nil {
-		actionBuilder = menu.deferredActionBuilder(update)
-	}
-
-	markup := actionBuilder.buildButtons(update.language)
+	markup := menuActionBuilder.buildButtons(update.language)
 
 	var replyText = menu.replyText
 	if menu.deferredReplyText != nil {
@@ -566,11 +563,16 @@ func (e *EngineWithPrivateStateHandlers[User]) getHandlerByAction(
 			}
 		}
 
-		if menu.inlineActionBuilder == nil {
+		menuActionBuilder := menu.getDeferredActionBuilder(update)
+		if menuActionBuilder == nil {
+			menuActionBuilder = menu.getActionBuilder()
+		}
+
+		if menuActionBuilder == nil {
 			continue
 		}
 
-		handlers := menu.inlineActionBuilder.getByCallbackActionData()
+		handlers := menuActionBuilder.getByCallbackActionData()
 		if handlers == nil {
 			continue
 		}
@@ -593,16 +595,16 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineCallbackHandler(
 		}
 	}
 
-	if menu.inlineActionBuilder == nil && menu.deferredActionBuilder == nil {
+	menuActionBuilder := menu.getDeferredActionBuilder(update)
+	if menuActionBuilder == nil {
+		menuActionBuilder = menu.getActionBuilder()
+	}
+
+	if menuActionBuilder == nil && menu.deferredActionBuilder == nil {
 		return fmt.Errorf("inline_menu_action_builder_not_set: %s", menu.callbackPrefix)
 	}
 
-	actionBuilder := menu.inlineActionBuilder
-	if menu.deferredActionBuilder != nil {
-		actionBuilder = menu.deferredActionBuilder(update)
-	}
-
-	actionHandlers := actionBuilder.getByCallbackActionData()
+	actionHandlers := menuActionBuilder.getByCallbackActionData()
 
 	if actionHandlers == nil {
 		return fmt.Errorf("inline_menu_action_builder_not_set: %s", menu.callbackPrefix)
