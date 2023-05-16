@@ -467,12 +467,15 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineHandler(
 	var cfg tgbotapi.Config
 
 	if edit {
-		cfg = client.EditMessageText().SetText(menu.replyText).
+		cfg = client.EditMessageText().SetText(replyText).
 			SetChatId(from.Id).
 			SetMessageId(update.Update.CallbackQuery.Message.MessageId).
 			SetReplyMarkup(markup)
 	} else {
-		cfg = client.Message().SetText(menu.replyText).SetChatId(from.Id).SetReplyMarkup(markup)
+		cfg = client.Message().
+			SetText(replyText).
+			SetChatId(from.Id).
+			SetReplyMarkup(markup)
 	}
 
 	_, err := client.Send(cfg)
