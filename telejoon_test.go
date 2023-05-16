@@ -127,6 +127,7 @@ func TestStart(t *testing.T) {
 						AddInlineMenu("Info2", telejoon.NewInlineMenu[ExampleUser]().
 							WithInlineActionBuilder(telejoon.NewInlineActionBuilder().
 								AddAlertButtonWithDialog("Hello", "say_hello_4", "Hello Friend").
+								AddInlineMenuButtonWithEdit("CustomInline", "CustomInline", "CustomInline").
 								AddInlineMenuButtonWithEdit("Back", "Info", "Info")).
 							WithReplyText("Info2 Inline Menu")).
 						AddCallbackQueryHandler("callback_1", func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser], args ...string) error {
@@ -138,7 +139,8 @@ func TestStart(t *testing.T) {
 								SetCallbackQueryId(update.Update.CallbackQuery.Id).
 								SetText(text))
 							return nil
-						})
+						}).
+						AddInlineMenu("CustomInline", CustomInlineMenu())
 				},
 			},
 		},
@@ -153,4 +155,21 @@ func TestStart(t *testing.T) {
 	}
 
 	<-stop
+}
+
+func CustomInlineMenu() *telejoon.InlineMenu[ExampleUser] {
+	menu := telejoon.NewInlineMenu[ExampleUser]()
+
+	menu.AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) bool {
+		actionBuilder := telejoon.NewInlineActionBuilder().
+			AddAlertButtonWithDialog("Hello", "say_hello_4", "Hello Friend")
+
+		menu.WithInlineActionBuilder(actionBuilder)
+
+		return true
+	})
+
+	menu.WithReplyText("Custom Inline Menu")
+
+	return menu
 }

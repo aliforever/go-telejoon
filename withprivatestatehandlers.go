@@ -286,12 +286,6 @@ func (e *EngineWithPrivateStateHandlers[User]) processCallbackQuery(
 		}
 		return
 	} else {
-		for _, f := range inlineMenu.middlewares {
-			if !f(client, update) {
-				return
-			}
-		}
-
 		if err := e.processInlineCallbackHandler(client, update, inlineMenu, data[1:]); err != nil {
 			e.onErr(client, update.Update, errors.New("error processing inline menu: "+err.Error()))
 		}
@@ -472,6 +466,8 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineHandler(
 		if err != nil {
 			return fmt.Errorf("error_sending_message_to_user: %d, %w", from.Id, err)
 		}
+	} else {
+		return fmt.Errorf("inline_menu_reply_text_not_set: %s", menuName)
 	}
 
 	return nil
