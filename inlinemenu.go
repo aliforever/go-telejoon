@@ -37,21 +37,21 @@ func NewInlineMenuWithTextAndDeferredActionBuilder[User any](
 
 func NewInlineMenuWithDeferredTextAndDeferredActionBuilder[User any](
 	deferredText func(update *StateUpdate[User]) string,
-	builder *InlineActionBuilder) *InlineMenu[User] {
-
-	return &InlineMenu[User]{
-		deferredReplyText:   deferredText,
-		inlineActionBuilder: builder,
-	}
-}
-
-func NewInlineMenuWithDeferredTextAndActionBuilder[User any](
-	deferredText func(update *StateUpdate[User]) string,
 	deferredBuilder func(update *StateUpdate[User]) *InlineActionBuilder) *InlineMenu[User] {
 
 	return &InlineMenu[User]{
 		deferredReplyText:     deferredText,
 		deferredActionBuilder: deferredBuilder,
+	}
+}
+
+func NewInlineMenuWithDeferredTextAndActionBuilder[User any](
+	deferredText func(update *StateUpdate[User]) string,
+	builder *InlineActionBuilder) *InlineMenu[User] {
+
+	return &InlineMenu[User]{
+		deferredReplyText:   deferredText,
+		inlineActionBuilder: builder,
 	}
 }
 
