@@ -587,13 +587,22 @@ func (e *EngineWithPrivateStateHandlers[User]) getHandlerByAction(
 func (e *EngineWithPrivateStateHandlers[User]) processInlineCallbackHandler(
 	client *tgbotapi.TelegramBot, update *StateUpdate[User], menu *InlineMenu[User], data []string) error {
 
-	for _, f := range menu.middlewares {
+	for _, f := range menu.getMiddlewares() {
 		if !f(client, update) {
 			return nil
 		}
 	}
 
-	actionHandlers := menu.inlineActionBuilder.getByCallbackActionData()
+	if menu.inlineActionBuilder == nil && menu.deferredActionBuilder == nil {
+		return fmt.Errorf("inline_menu_action_builder_not_set: %s", menu.callbackPrefix)
+	}
+
+	actionBuilder := menu.inlineActionBuilder
+	if menu.deferredActionBuilder != nil {
+		actionBuilder = menu.deferredActionBuilder(update)
+	}
+
+	actionHandlers := actionBuilder.getByCallbackActionData()
 
 	if actionHandlers == nil {
 		return fmt.Errorf("inline_menu_action_builder_not_set: %s", menu.callbackPrefix)
