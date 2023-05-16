@@ -8,56 +8,63 @@ import (
 type InlineMenu[User any] struct {
 	lock sync.Mutex
 
-	replyText string
+	middlewares []func(*tgbotapi.TelegramBot, *StateUpdate[User]) bool
+
+	replyText         string
+	deferredReplyText func(update *StateUpdate[User]) string
 
 	callbackPrefix string
 
-	inlineActionBuilder *inlineActionBuilder
-
-	middlewares []func(*tgbotapi.TelegramBot, *StateUpdate[User]) bool
+	inlineActionBuilder   *InlineActionBuilder
+	deferredActionBuilder func(update *StateUpdate[User]) *InlineActionBuilder
 }
 
-func NewInlineMenu[User any]() *InlineMenu[User] {
-	return &InlineMenu[User]{}
+func NewInlineMenuWithTextAndActionBuilder[User any](text string, builder *InlineActionBuilder) *InlineMenu[User] {
+	return &InlineMenu[User]{
+		replyText:           text,
+		inlineActionBuilder: builder,
+	}
+}
+
+func NewInlineMenuWithTextAndDeferredActionBuilder[User any](
+	text string, deferredBuilder func(update *StateUpdate[User]) *InlineActionBuilder) *InlineMenu[User] {
+
+	return &InlineMenu[User]{
+		replyText:             text,
+		deferredActionBuilder: deferredBuilder,
+	}
+}
+
+func NewInlineMenuWithDeferredTextAndDeferredActionBuilder[User any](
+	deferredText func(update *StateUpdate[User]) string,
+	builder *InlineActionBuilder) *InlineMenu[User] {
+
+	return &InlineMenu[User]{
+		deferredReplyText:   deferredText,
+		inlineActionBuilder: builder,
+	}
+}
+
+func NewInlineMenuWithDeferredTextAndActionBuilder[User any](
+	deferredText func(update *StateUpdate[User]) string,
+	deferredBuilder func(update *StateUpdate[User]) *InlineActionBuilder) *InlineMenu[User] {
+
+	return &InlineMenu[User]{
+		deferredReplyText:     deferredText,
+		deferredActionBuilder: deferredBuilder,
+	}
 }
 
 // AddMiddleware adds a middleware to the inline menu
-func (i *InlineMenu[User]) AddMiddleware(middleware func(*tgbotapi.TelegramBot, *StateUpdate[User]) bool) *InlineMenu[User] {
+func (i *InlineMenu[User]) AddMiddleware(
+	middleware func(*tgbotapi.TelegramBot, *StateUpdate[User]) bool) *InlineMenu[User] {
+
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
 	i.middlewares = append(i.middlewares, middleware)
 
 	return i
-}
-
-func (i *InlineMenu[User]) WithReplyText(text string) *InlineMenu[User] {
-	i.lock.Lock()
-	defer i.lock.Unlock()
-
-	i.replyText = text
-
-	return i
-}
-
-func (i *InlineMenu[User]) WithInlineActionBuilder(
-	builder *inlineActionBuilder) *InlineMenu[User] {
-
-	i.lock.Lock()
-	defer i.lock.Unlock()
-
-	builder.inlineMenu = i.callbackPrefix
-	i.inlineActionBuilder = builder
-
-	return i
-}
-
-// getReplyText returns the reply text.
-func (i *InlineMenu[User]) getReplyText() string {
-	i.lock.Lock()
-	defer i.lock.Unlock()
-
-	return i.replyText
 }
 
 // getMiddlewares returns the middlewares.

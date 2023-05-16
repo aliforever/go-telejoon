@@ -444,30 +444,40 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineHandler(
 		}
 	}
 
-	if menu.inlineActionBuilder == nil {
+	if menu.inlineActionBuilder == nil && menu.deferredActionBuilder == nil {
 		return fmt.Errorf("inline_menu_action_builder_not_set: %s", menuName)
 	}
 
-	markup := menu.inlineActionBuilder.buildButtons(update.language)
+	actionBuilder := menu.inlineActionBuilder
+	if menu.deferredActionBuilder != nil {
+		actionBuilder = menu.deferredActionBuilder(update)
+	}
 
-	if replyText := menu.getReplyText(); replyText != "" {
-		var cfg tgbotapi.Config
+	markup := actionBuilder.buildButtons(update.language)
 
-		if edit {
-			cfg = client.EditMessageText().SetText(menu.replyText).
-				SetChatId(from.Id).
-				SetMessageId(update.Update.CallbackQuery.Message.MessageId).
-				SetReplyMarkup(markup)
-		} else {
-			cfg = client.Message().SetText(menu.replyText).SetChatId(from.Id).SetReplyMarkup(markup)
-		}
+	var replyText = menu.replyText
+	if menu.deferredReplyText != nil {
+		replyText = menu.deferredReplyText(update)
+	}
 
-		_, err := client.Send(cfg)
-		if err != nil {
-			return fmt.Errorf("error_sending_message_to_user: %d, %w", from.Id, err)
-		}
-	} else {
+	if replyText == "" {
 		return fmt.Errorf("inline_menu_reply_text_not_set: %s", menuName)
+	}
+
+	var cfg tgbotapi.Config
+
+	if edit {
+		cfg = client.EditMessageText().SetText(menu.replyText).
+			SetChatId(from.Id).
+			SetMessageId(update.Update.CallbackQuery.Message.MessageId).
+			SetReplyMarkup(markup)
+	} else {
+		cfg = client.Message().SetText(menu.replyText).SetChatId(from.Id).SetReplyMarkup(markup)
+	}
+
+	_, err := client.Send(cfg)
+	if err != nil {
+		return fmt.Errorf("error_sending_message_to_user: %d, %w", from.Id, err)
 	}
 
 	return nil

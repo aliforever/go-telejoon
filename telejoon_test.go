@@ -112,8 +112,9 @@ func TestStart(t *testing.T) {
 							WithStaticActionBuilder(telejoon.NewActionBuilder().
 								AddStateButtonT("Global.Back", "Welcome")).
 							ReplyWithLanguageKey("Info.Hello")).
-						AddInlineMenu("Info", telejoon.NewInlineMenu[ExampleUser]().
-							WithInlineActionBuilder(telejoon.NewInlineActionBuilder().
+						AddInlineMenu("Info", telejoon.
+							NewInlineMenuWithTextAndActionBuilder[ExampleUser]("Info Inline Menu",
+							telejoon.NewInlineActionBuilder().
 								AddUrlButton("Google", "https://google.com").
 								AddAlertButtonT("Info.Hello", "say_hello_0", "HI!").
 								AddAlertButton("Hello", "say_hello", "Hello Friend").
@@ -122,14 +123,13 @@ func TestStart(t *testing.T) {
 								AddCallbackButton("Callback 1", "callback_1:data").
 								AddCallbackButton("Callback 2", "callback_1:data2").
 								AddInlineMenuButtonWithEdit("Change Menu to Info 2", "Info2", "Info2").
-								SetMaxButtonPerRow(3)).
-							WithReplyText("Info Inline Menu")).
-						AddInlineMenu("Info2", telejoon.NewInlineMenu[ExampleUser]().
-							WithInlineActionBuilder(telejoon.NewInlineActionBuilder().
+								SetMaxButtonPerRow(3))).
+						AddInlineMenu("Info2", telejoon.
+							NewInlineMenuWithTextAndActionBuilder[ExampleUser](
+							"Info2 Inline Menu", telejoon.NewInlineActionBuilder().
 								AddAlertButtonWithDialog("Hello", "say_hello_4", "Hello Friend").
 								AddInlineMenuButtonWithEdit("CustomInline", "CustomInline", "CustomInline").
-								AddInlineMenuButtonWithEdit("Back", "Info", "Info")).
-							WithReplyText("Info2 Inline Menu")).
+								AddInlineMenuButtonWithEdit("Back", "Info", "Info"))).
 						AddCallbackQueryHandler("callback_1", func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser], args ...string) error {
 							text := "Callback 1 Clicked"
 							if len(args) > 0 {
@@ -158,18 +158,11 @@ func TestStart(t *testing.T) {
 }
 
 func CustomInlineMenu() *telejoon.InlineMenu[ExampleUser] {
-	menu := telejoon.NewInlineMenu[ExampleUser]()
-
-	menu.AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) bool {
-		actionBuilder := telejoon.NewInlineActionBuilder().
+	deferredBuilder := func(update *telejoon.StateUpdate[ExampleUser]) *telejoon.InlineActionBuilder {
+		return telejoon.NewInlineActionBuilder().
 			AddAlertButtonWithDialog("Hello", "say_hello_4", "Hello Friend")
+	}
 
-		menu.WithInlineActionBuilder(actionBuilder)
-
-		return true
-	})
-
-	menu.WithReplyText("Custom Inline Menu")
-
-	return menu
+	return telejoon.
+		NewInlineMenuWithTextAndDeferredActionBuilder[ExampleUser]("Custom Inline Menu", deferredBuilder)
 }

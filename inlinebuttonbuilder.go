@@ -78,7 +78,7 @@ type InlineAction interface {
 	Options() *ButtonOptions
 }
 
-type inlineActionBuilder struct {
+type InlineActionBuilder struct {
 	locker sync.Mutex
 
 	inlineMenu string
@@ -89,13 +89,13 @@ type inlineActionBuilder struct {
 	maxButtonPerRow int
 }
 
-// NewInlineActionBuilder creates a new inlineActionBuilder.
-func NewInlineActionBuilder() *inlineActionBuilder {
-	return &inlineActionBuilder{}
+// NewInlineActionBuilder creates a new InlineActionBuilder.
+func NewInlineActionBuilder() *InlineActionBuilder {
+	return &InlineActionBuilder{}
 }
 
 // SetMaxButtonPerRow sets the maximum number of buttons per row.
-func (b *inlineActionBuilder) SetMaxButtonPerRow(max int) *inlineActionBuilder {
+func (b *InlineActionBuilder) SetMaxButtonPerRow(max int) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -104,7 +104,7 @@ func (b *inlineActionBuilder) SetMaxButtonPerRow(max int) *inlineActionBuilder {
 	return b
 }
 
-func (b *inlineActionBuilder) SetButtonFormation(formation ...int) *inlineActionBuilder {
+func (b *InlineActionBuilder) SetButtonFormation(formation ...int) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -113,9 +113,9 @@ func (b *inlineActionBuilder) SetButtonFormation(formation ...int) *inlineAction
 	return b
 }
 
-// AddUrlButton adds a new url button to the inlineActionBuilder.
-func (b *inlineActionBuilder) AddUrlButton(
-	button string, address string, opts ...*ButtonOptions) *inlineActionBuilder {
+// AddUrlButton adds a new url button to the InlineActionBuilder.
+func (b *InlineActionBuilder) AddUrlButton(
+	button string, address string, opts ...*ButtonOptions) *InlineActionBuilder {
 
 	b.locker.Lock()
 	defer b.locker.Unlock()
@@ -131,8 +131,8 @@ func (b *inlineActionBuilder) AddUrlButton(
 	return b
 }
 
-func (b *inlineActionBuilder) AddUrlButtonT(
-	button string, address string, opts ...*ButtonOptions) *inlineActionBuilder {
+func (b *InlineActionBuilder) AddUrlButtonT(
+	button string, address string, opts ...*ButtonOptions) *InlineActionBuilder {
 
 	b.locker.Lock()
 	defer b.locker.Unlock()
@@ -156,8 +156,8 @@ func (b *inlineActionBuilder) AddUrlButtonT(
 	return b
 }
 
-func (b *inlineActionBuilder) AddInlineMenuButton(
-	button, data, inlineMenu string, opts ...*ButtonOptions) *inlineActionBuilder {
+func (b *InlineActionBuilder) AddInlineMenuButton(
+	button, data, inlineMenu string, opts ...*ButtonOptions) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -173,8 +173,8 @@ func (b *inlineActionBuilder) AddInlineMenuButton(
 	return b
 }
 
-func (b *inlineActionBuilder) AddInlineMenuButtonWithEdit(
-	button, data, inlineMenu string, opts ...*ButtonOptions) *inlineActionBuilder {
+func (b *InlineActionBuilder) AddInlineMenuButtonWithEdit(
+	button, data, inlineMenu string, opts ...*ButtonOptions) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -191,8 +191,8 @@ func (b *inlineActionBuilder) AddInlineMenuButtonWithEdit(
 	return b
 }
 
-func (b *inlineActionBuilder) AddInlineMenuButtonT(
-	button, data, inlineMenu string, opts ...*ButtonOptions) *inlineActionBuilder {
+func (b *InlineActionBuilder) AddInlineMenuButtonT(
+	button, data, inlineMenu string, opts ...*ButtonOptions) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -216,8 +216,8 @@ func (b *inlineActionBuilder) AddInlineMenuButtonT(
 	return b
 }
 
-func (b *inlineActionBuilder) AddInlineMenuButtonWithEditT(
-	button, data, inlineMenu string, opts ...*ButtonOptions) *inlineActionBuilder {
+func (b *InlineActionBuilder) AddInlineMenuButtonWithEditT(
+	button, data, inlineMenu string, opts ...*ButtonOptions) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -242,8 +242,8 @@ func (b *inlineActionBuilder) AddInlineMenuButtonWithEditT(
 	return b
 }
 
-func (b *inlineActionBuilder) AddAlertButton(
-	button, data, alertText string, opts ...*ButtonOptions) *inlineActionBuilder {
+func (b *InlineActionBuilder) AddAlertButton(
+	button, data, alertText string, opts ...*ButtonOptions) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -259,8 +259,8 @@ func (b *inlineActionBuilder) AddAlertButton(
 	return b
 }
 
-func (b *inlineActionBuilder) AddAlertButtonWithDialog(
-	button, data, alertText string, opts ...*ButtonOptions) *inlineActionBuilder {
+func (b *InlineActionBuilder) AddAlertButtonWithDialog(
+	button, data, alertText string, opts ...*ButtonOptions) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -285,8 +285,8 @@ func (b *inlineActionBuilder) AddAlertButtonWithDialog(
 	return b
 }
 
-func (b *inlineActionBuilder) AddAlertButtonT(
-	button, data, alertText string, opts ...*ButtonOptions) *inlineActionBuilder {
+func (b *InlineActionBuilder) AddAlertButtonT(
+	button, data, alertText string, opts ...*ButtonOptions) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -310,8 +310,8 @@ func (b *inlineActionBuilder) AddAlertButtonT(
 	return b
 }
 
-func (b *inlineActionBuilder) AddAlertButtonWithDialogT(
-	button, data, alertText string, opts ...*ButtonOptions) *inlineActionBuilder {
+func (b *InlineActionBuilder) AddAlertButtonWithDialogT(
+	button, data, alertText string, opts ...*ButtonOptions) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -336,7 +336,7 @@ func (b *inlineActionBuilder) AddAlertButtonWithDialogT(
 	return b
 }
 
-func (b *inlineActionBuilder) AddStateButton(button, data, state string, opts ...*ButtonOptions) *inlineActionBuilder {
+func (b *InlineActionBuilder) AddStateButton(button, data, state string, opts ...*ButtonOptions) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -352,8 +352,8 @@ func (b *inlineActionBuilder) AddStateButton(button, data, state string, opts ..
 	return b
 }
 
-// AddStateButtonT adds a state action to the inlineActionBuilder with name translation.
-func (b *inlineActionBuilder) AddStateButtonT(button, data, state string, opts ...*ButtonOptions) *inlineActionBuilder {
+// AddStateButtonT adds a state action to the InlineActionBuilder with name translation.
+func (b *InlineActionBuilder) AddStateButtonT(button, data, state string, opts ...*ButtonOptions) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -377,7 +377,7 @@ func (b *inlineActionBuilder) AddStateButtonT(button, data, state string, opts .
 	return b
 }
 
-func (b *inlineActionBuilder) AddCallbackButton(button, data string, opts ...*ButtonOptions) *inlineActionBuilder {
+func (b *InlineActionBuilder) AddCallbackButton(button, data string, opts ...*ButtonOptions) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -392,8 +392,8 @@ func (b *inlineActionBuilder) AddCallbackButton(button, data string, opts ...*Bu
 	return b
 }
 
-// AddCallbackButtonT adds a state action to the inlineActionBuilder with name translation.
-func (b *inlineActionBuilder) AddCallbackButtonT(button, data string, opts ...*ButtonOptions) *inlineActionBuilder {
+// AddCallbackButtonT adds a state action to the InlineActionBuilder with name translation.
+func (b *InlineActionBuilder) AddCallbackButtonT(button, data string, opts ...*ButtonOptions) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -417,7 +417,7 @@ func (b *inlineActionBuilder) AddCallbackButtonT(button, data string, opts ...*B
 }
 
 // buildButtons builds the buttons.
-func (b *inlineActionBuilder) buildButtons(language *Language) *structs.InlineKeyboardMarkup {
+func (b *InlineActionBuilder) buildButtons(language *Language) *structs.InlineKeyboardMarkup {
 	if len(b.buttons) == 0 {
 		return nil
 	}
@@ -466,7 +466,7 @@ func (b *inlineActionBuilder) buildButtons(language *Language) *structs.InlineKe
 	return tools.Keyboards{}.NewInlineKeyboardFromSlicesOfMapWithFormation(rows, b.maxButtonPerRow, b.buttonFormation)
 }
 
-func (b *inlineActionBuilder) getByCallbackActionData() map[string]InlineAction {
+func (b *InlineActionBuilder) getByCallbackActionData() map[string]InlineAction {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
