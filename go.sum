@@ -1,8 +1,8 @@
 github.com/BurntSushi/toml v1.0.0/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
 github.com/BurntSushi/toml v1.2.1 h1:9F2/+DoOYIOksmaJFPw1tGFy1eDnIJXg+UHjuD8lTak=
 github.com/BurntSushi/toml v1.2.1/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
-github.com/aliforever/go-telegram-bot-api v0.2.14 h1:Ut37gn2VBcPOjdrzh0N1t6QE3Y5wgWQ/ZhqyEje9p9A=
-github.com/aliforever/go-telegram-bot-api v0.2.14/go.mod h1:MtlIWawW8t/oNaX+an1QDh8gAIzSrNV6cP8x2BMBq8Y=
+github.com/aliforever/go-telegram-bot-api v0.2.15 h1:PdDb3vNb2RwMGmC43BYiyHztj5BBDC7aeaLXZm0VK/4=
+github.com/aliforever/go-telegram-bot-api v0.2.15/go.mod h1:MtlIWawW8t/oNaX+an1QDh8gAIzSrNV6cP8x2BMBq8Y=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
