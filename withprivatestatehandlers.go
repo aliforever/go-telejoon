@@ -667,13 +667,9 @@ func (e *EngineWithPrivateStateHandlers[User]) processSwitchAction(
 
 	switch sa := action.(type) {
 	case *SwitchActionState:
-		if err := e.switchState(update.Update.CallbackQuery.From.Id, action.target(), client, update); err != nil {
-			return true, err
-		}
+		return true, e.switchState(update.Update.CallbackQuery.From.Id, action.target(), client, update)
 	case *SwitchActionInlineMenu:
-		if err := e.processInlineHandler(action.target(), client, update, sa.edit); err != nil {
-			return true, err
-		}
+		return true, e.processInlineHandler(action.target(), client, update, sa.edit)
 	}
 
 	return true, errors.New("unknown switch action")
