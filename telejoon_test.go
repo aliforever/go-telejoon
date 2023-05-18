@@ -130,16 +130,7 @@ func TestStart(t *testing.T) {
 								AddAlertButtonWithDialog("Hello", "say_hello_4", "Hello Friend").
 								AddInlineMenuButtonWithEdit("CustomInline", "CustomInline", "CustomInline").
 								AddInlineMenuButtonWithEdit("Back", "Info", "Info"))).
-						AddCallbackQueryHandler("callback_1", func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser], args ...string) error {
-							text := "Callback 1 Clicked"
-							if len(args) > 0 {
-								text = fmt.Sprintf("Callback 1 Clicked with args: %s", args[0])
-							}
-							client.Send(client.AnswerCallbackQuery().
-								SetCallbackQueryId(update.Update.CallbackQuery.Id).
-								SetText(text))
-							return nil
-						}).
+						AddCallbackQueryHandler("callback_1", callbackHandler).
 						AddInlineMenu("CustomInline", CustomInlineMenu())
 				},
 			},
@@ -155,6 +146,22 @@ func TestStart(t *testing.T) {
 	}
 
 	<-stop
+}
+
+func callbackHandler(
+	client *tgbotapi.TelegramBot,
+	update *telejoon.StateUpdate[ExampleUser],
+	args ...string,
+) (telejoon.SwitchAction, error) {
+
+	text := "Callback 1 Clicked"
+	if len(args) > 0 {
+		text = fmt.Sprintf("Callback 1 Clicked with args: %s", args[0])
+	}
+	client.Send(client.AnswerCallbackQuery().
+		SetCallbackQueryId(update.Update.CallbackQuery.Id).
+		SetText(text))
+	return nil, nil
 }
 
 func CustomInlineMenu() *telejoon.InlineMenu[ExampleUser] {

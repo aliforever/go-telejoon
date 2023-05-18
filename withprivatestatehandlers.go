@@ -24,7 +24,8 @@ type EngineWithPrivateStateHandlers[User any] struct {
 
 	inlineMenus map[string]*InlineMenu[User]
 
-	callbackQueryHandlers map[string]func(client *tgbotapi.TelegramBot, update *StateUpdate[User], args ...string) error
+	callbackQueryHandlers map[string]func(
+		client *tgbotapi.TelegramBot, update *StateUpdate[User], args ...string) (SwitchAction, error)
 
 	languageConfig *LanguageConfig
 }
@@ -36,11 +37,12 @@ func WithPrivateStateHandlers[User any](
 		engine: engine[User, any, any, any]{
 			opts: opts,
 		},
-		userRepository:        userRepo,
-		defaultStateName:      defaultState,
-		staticMenus:           map[string]*StaticMenu[User]{},
-		inlineMenus:           map[string]*InlineMenu[User]{},
-		callbackQueryHandlers: map[string]func(*tgbotapi.TelegramBot, *StateUpdate[User], ...string) error{},
+		userRepository:   userRepo,
+		defaultStateName: defaultState,
+		staticMenus:      map[string]*StaticMenu[User]{},
+		inlineMenus:      map[string]*InlineMenu[User]{},
+		callbackQueryHandlers: map[string]func(
+			*tgbotapi.TelegramBot, *StateUpdate[User], ...string) (SwitchAction, error){},
 	}
 }
 
@@ -200,7 +202,8 @@ func (e *EngineWithPrivateStateHandlers[User]) Process(client *tgbotapi.Telegram
 // AddCallbackQueryHandler adds a callback query handler
 func (e *EngineWithPrivateStateHandlers[User]) AddCallbackQueryHandler(
 	data string,
-	fn func(*tgbotapi.TelegramBot, *StateUpdate[User], ...string) error) *EngineWithPrivateStateHandlers[User] {
+	fn func(*tgbotapi.TelegramBot, *StateUpdate[User], ...string) (SwitchAction, error),
+) *EngineWithPrivateStateHandlers[User] {
 
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -241,7 +244,7 @@ func (e *EngineWithPrivateStateHandlers[User]) SendInlineMenu(
 
 // getCallbackQueryHandler returns a callback query handler by data
 func (e *EngineWithPrivateStateHandlers[User]) getCallbackQueryHandler(
-	data string) func(*tgbotapi.TelegramBot, *StateUpdate[User], ...string) error {
+	data string) func(*tgbotapi.TelegramBot, *StateUpdate[User], ...string) (SwitchAction, error) {
 
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -274,9 +277,16 @@ func (e *EngineWithPrivateStateHandlers[User]) processCallbackQuery(
 
 	if inlineMenu, ok := e.inlineMenus[menu]; !ok {
 		if callbackHandler := e.getCallbackQueryHandler(data[0]); callbackHandler != nil {
-			err := callbackHandler(client, update, data[1:]...)
+			switchAction, err := callbackHandler(client, update, data[1:]...)
 			if err != nil {
 				e.onErr(client, update.Update, err)
+				return
+			}
+
+			if switched, err := e.processSwitchAction(switchAction, update, client); err != nil {
+				e.onErr(client, update.Update, err)
+			} else if switched {
+				return
 			}
 		} else {
 			e.onErr(client, update.Update, errors.New("callback query handler not found: "+data[0]))
@@ -623,14 +633,22 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineCallbackHandler(
 
 			return err
 		case inlineStateButton:
-			// TODO: Implement Switch With Edit Message
+			// TODO: Implement Switch With edit Message
 
 			return e.switchState(update.Update.From().Id, btn.state, client, update)
 		case inlineInlineMenuButton:
 			return e.processInlineHandler(btn.menu, client, update, btn.edit)
 		case inlineCallbackButton:
 			if callbackHandler := e.getCallbackQueryHandler(data[0]); callbackHandler != nil {
-				return callbackHandler(client, update, data[1:]...)
+				switchAction, err := callbackHandler(client, update, data[1:]...)
+				if err != nil {
+					return err
+				}
+				if switched, err := e.processSwitchAction(switchAction, update, client); err != nil {
+					return err
+				} else if switched {
+					return nil
+				}
 			}
 
 			return errors.New("callback query handler not found")
@@ -638,4 +656,25 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineCallbackHandler(
 	}
 
 	return errors.New("processor_for_action_not_found")
+}
+
+func (e *EngineWithPrivateStateHandlers[User]) processSwitchAction(
+	action SwitchAction, update *StateUpdate[User], client *tgbotapi.TelegramBot) (bool, error) {
+
+	if action == nil {
+		return false, nil
+	}
+
+	switch sa := action.(type) {
+	case *SwitchActionState:
+		if err := e.switchState(update.Update.CallbackQuery.From.Id, action.target(), client, update); err != nil {
+			return true, err
+		}
+	case *SwitchActionInlineMenu:
+		if err := e.processInlineHandler(action.target(), client, update, sa.edit); err != nil {
+			return true, err
+		}
+	}
+
+	return true, errors.New("unknown switch action")
 }
