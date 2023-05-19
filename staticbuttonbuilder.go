@@ -172,7 +172,7 @@ type Action interface {
 	Result() string
 }
 
-type actionBuilder struct {
+type ActionBuilder struct {
 	locker sync.Mutex
 
 	buttons  []Action
@@ -184,15 +184,15 @@ type actionBuilder struct {
 	maxButtonPerRow int
 }
 
-// NewActionBuilder creates a new actionBuilder.
-func NewActionBuilder() *actionBuilder {
-	return &actionBuilder{
+// NewActionBuilder creates a new ActionBuilder.
+func NewActionBuilder() *ActionBuilder {
+	return &ActionBuilder{
 		buttonOptions: make(map[string][]*ButtonOptions),
 	}
 }
 
 // SetMaxButtonPerRow sets the maximum number of buttons per row.
-func (b *actionBuilder) SetMaxButtonPerRow(max int) *actionBuilder {
+func (b *ActionBuilder) SetMaxButtonPerRow(max int) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -201,7 +201,7 @@ func (b *actionBuilder) SetMaxButtonPerRow(max int) *actionBuilder {
 	return b
 }
 
-func (b *actionBuilder) SetButtonFormation(formation ...int) *actionBuilder {
+func (b *ActionBuilder) SetButtonFormation(formation ...int) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -210,8 +210,8 @@ func (b *actionBuilder) SetButtonFormation(formation ...int) *actionBuilder {
 	return b
 }
 
-// AddTextButton adds a textHandler action to the actionBuilder.
-func (b *actionBuilder) AddTextButton(button, text string, opts ...*ButtonOptions) *actionBuilder {
+// AddTextButton adds a textHandler action to the ActionBuilder.
+func (b *ActionBuilder) AddTextButton(button, text string, opts ...*ButtonOptions) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -230,8 +230,8 @@ func (b *actionBuilder) AddTextButton(button, text string, opts ...*ButtonOption
 	return b
 }
 
-// AddTextButtonT adds a textHandler action to the actionBuilder with name translation.
-func (b *actionBuilder) AddTextButtonT(button, text string, opts ...*ButtonOptions) *actionBuilder {
+// AddTextButtonT adds a textHandler action to the ActionBuilder with name translation.
+func (b *ActionBuilder) AddTextButtonT(button, text string, opts ...*ButtonOptions) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -254,9 +254,9 @@ func (b *actionBuilder) AddTextButtonT(button, text string, opts ...*ButtonOptio
 	return b
 }
 
-// AddInlineMenuButton adds an inline menu action to the actionBuilder.
-func (b *actionBuilder) AddInlineMenuButton(
-	button, inlineMenu string, opts ...*ButtonOptions) *actionBuilder {
+// AddInlineMenuButton adds an inline menu action to the ActionBuilder.
+func (b *ActionBuilder) AddInlineMenuButton(
+	button, inlineMenu string, opts ...*ButtonOptions) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -275,8 +275,8 @@ func (b *actionBuilder) AddInlineMenuButton(
 	return b
 }
 
-// AddInlineMenuButtonT adds an inline menu action to the actionBuilder with name translation.
-func (b *actionBuilder) AddInlineMenuButtonT(button, inlineMenu string, opts ...*ButtonOptions) *actionBuilder {
+// AddInlineMenuButtonT adds an inline menu action to the ActionBuilder with name translation.
+func (b *ActionBuilder) AddInlineMenuButtonT(button, inlineMenu string, opts ...*ButtonOptions) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -298,8 +298,8 @@ func (b *actionBuilder) AddInlineMenuButtonT(button, inlineMenu string, opts ...
 	return b
 }
 
-// AddStateButton adds a state action to the actionBuilder.
-func (b *actionBuilder) AddStateButton(button, state string, opts ...*ButtonOptions) *actionBuilder {
+// AddStateButton adds a state action to the ActionBuilder.
+func (b *ActionBuilder) AddStateButton(button, state string, opts ...*ButtonOptions) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -321,8 +321,8 @@ func (b *actionBuilder) AddStateButton(button, state string, opts ...*ButtonOpti
 	return b
 }
 
-// AddStateButtonT adds a state action to the actionBuilder with name translation.
-func (b *actionBuilder) AddStateButtonT(button, state string, opts ...*ButtonOptions) *actionBuilder {
+// AddStateButtonT adds a state action to the ActionBuilder with name translation.
+func (b *ActionBuilder) AddStateButtonT(button, state string, opts ...*ButtonOptions) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -343,8 +343,8 @@ func (b *actionBuilder) AddStateButtonT(button, state string, opts ...*ButtonOpt
 	return b
 }
 
-// AddRawButton adds a raw button to the actionBuilder.
-func (b *actionBuilder) AddRawButton(button string, opts ...*ButtonOptions) *actionBuilder {
+// AddRawButton adds a raw button to the ActionBuilder.
+func (b *ActionBuilder) AddRawButton(button string, opts ...*ButtonOptions) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -366,8 +366,8 @@ func (b *actionBuilder) AddRawButton(button string, opts ...*ButtonOptions) *act
 	return b
 }
 
-// AddRawButtonT adds a raw button to the actionBuilder with name translation.
-func (b *actionBuilder) AddRawButtonT(button string, opts ...*ButtonOptions) *actionBuilder {
+// AddRawButtonT adds a raw button to the ActionBuilder with name translation.
+func (b *ActionBuilder) AddRawButtonT(button string, opts ...*ButtonOptions) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -388,8 +388,8 @@ func (b *actionBuilder) AddRawButtonT(button string, opts ...*ButtonOptions) *ac
 	return b
 }
 
-// AddTextCommand adds a textHandler command to the actionBuilder.
-func (b *actionBuilder) AddTextCommand(command, text string) *actionBuilder {
+// AddTextCommand adds a textHandler command to the ActionBuilder.
+func (b *ActionBuilder) AddTextCommand(command, text string) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -403,8 +403,8 @@ func (b *actionBuilder) AddTextCommand(command, text string) *actionBuilder {
 	return b
 }
 
-// AddInlineMenuCommand adds an inline menu command to the actionBuilder.
-func (b *actionBuilder) AddInlineMenuCommand(command, inlineMenu string) *actionBuilder {
+// AddInlineMenuCommand adds an inline menu command to the ActionBuilder.
+func (b *ActionBuilder) AddInlineMenuCommand(command, inlineMenu string) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -418,8 +418,8 @@ func (b *actionBuilder) AddInlineMenuCommand(command, inlineMenu string) *action
 	return b
 }
 
-// AddStateCommand adds a state command to the actionBuilder.
-func (b *actionBuilder) AddStateCommand(command, state string) *actionBuilder {
+// AddStateCommand adds a state command to the ActionBuilder.
+func (b *ActionBuilder) AddStateCommand(command, state string) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -433,8 +433,8 @@ func (b *actionBuilder) AddStateCommand(command, state string) *actionBuilder {
 	return b
 }
 
-// AddCustomButton adds a custom action of button type to the actionBuilder.
-func (b *actionBuilder) AddCustomButton(action Action, opts ...*ButtonOptions) *actionBuilder {
+// AddCustomButton adds a custom action of button type to the ActionBuilder.
+func (b *ActionBuilder) AddCustomButton(action Action, opts ...*ButtonOptions) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -447,8 +447,8 @@ func (b *actionBuilder) AddCustomButton(action Action, opts ...*ButtonOptions) *
 	return b
 }
 
-// AddCustomCommand adds a custom action of command type to the actionBuilder.
-func (b *actionBuilder) AddCustomCommand(action Action) *actionBuilder {
+// AddCustomCommand adds a custom action of command type to the ActionBuilder.
+func (b *ActionBuilder) AddCustomCommand(action Action) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -458,7 +458,7 @@ func (b *actionBuilder) AddCustomCommand(action Action) *actionBuilder {
 }
 
 // getButtonByButton returns the action by the button.
-func (b *actionBuilder) getButtonByButton(button string) Action {
+func (b *ActionBuilder) getButtonByButton(button string) Action {
 	for _, btn := range b.buttons {
 		if btn.Name() == button {
 			return btn
@@ -469,7 +469,7 @@ func (b *actionBuilder) getButtonByButton(button string) Action {
 }
 
 // buildButtons builds the buttons.
-func (b *actionBuilder) buildButtons(language *Language) *structs.ReplyKeyboardMarkup {
+func (b *ActionBuilder) buildButtons(language *Language) *structs.ReplyKeyboardMarkup {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -514,7 +514,7 @@ func (b *actionBuilder) buildButtons(language *Language) *structs.ReplyKeyboardM
 		newButtons, b.maxButtonPerRow, b.buttonFormation)
 }
 
-func (b *actionBuilder) languageValueButtonKeys(language *Language) map[string]string {
+func (b *ActionBuilder) languageValueButtonKeys(language *Language) map[string]string {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 

@@ -93,9 +93,18 @@ func (e *EngineWithPrivateStateHandlers[User]) WithLanguageConfig(
 		return e
 	}
 
-	menu := NewStaticMenu[User]()
+	text := ""
 
-	menu.AddMiddleware(func(bot *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool) {
+	for _, lang := range cfg.languages.localizers {
+		txt, _ := lang.Get(fmt.Sprintf("%s.Text", cfg.changeLanguageState))
+		if txt == "" {
+			txt = cfg.changeLanguageState
+		}
+
+		text += fmt.Sprintf("%s\n", txt)
+	}
+
+	deferredStaticActionBuilder := func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) *ActionBuilder {
 		actions := NewActionBuilder()
 
 		for i := range cfg.languages.localizers {
@@ -106,25 +115,13 @@ func (e *EngineWithPrivateStateHandlers[User]) WithLanguageConfig(
 				btnText = lang.tag
 			}
 
-			actions.AddCustomButton(NewChooseLanguageButton[User](btnText, e, update, cfg, &lang, bot))
+			actions.AddCustomButton(NewChooseLanguageButton[User](btnText, e, update, cfg, &lang, client))
 		}
 
-		menu.WithStaticActionBuilder(actions)
-
-		return "", true
-	})
-
-	text := ""
-	for _, lang := range cfg.languages.localizers {
-		txt, _ := lang.Get(fmt.Sprintf("%s.Text", cfg.changeLanguageState))
-		if txt == "" {
-			txt = cfg.changeLanguageState
-		}
-
-		text += fmt.Sprintf("%s\n", txt)
+		return actions
 	}
 
-	menu.ReplyWithText(text)
+	menu := NewStaticMenuWithTextAndDeferredActionBuilder(text, deferredStaticActionBuilder)
 
 	return e.AddStaticMenu(cfg.changeLanguageState, menu)
 }
@@ -156,6 +153,16 @@ func (e *EngineWithPrivateStateHandlers[User]) Process(client *tgbotapi.Telegram
 		userLanguage, err := e.languageConfig.repo.GetUserLanguage(from.Id)
 		if err != nil {
 			if err == UserLanguageNotFoundErr && e.languageConfig.forceChooseLanguage {
+				if update.CallbackQuery != nil {
+					go func() {
+						_, err := client.Send(client.AnswerCallbackQuery().
+							SetCallbackQueryId(update.CallbackQuery.Id).
+							SetShowAlert(false))
+						if err != nil {
+							e.onErr(client, update, err)
+						}
+					}()
+				}
 				if userState != e.languageConfig.changeLanguageState {
 					err = e.switchState(
 						from.Id, e.languageConfig.changeLanguageState, client, su)
@@ -283,10 +290,8 @@ func (e *EngineWithPrivateStateHandlers[User]) processCallbackQuery(
 				return
 			}
 
-			if switched, err := e.processSwitchAction(switchAction, update, client); err != nil {
+			if err := e.processSwitchAction(switchAction, update, client); err != nil {
 				e.onErr(client, update.Update, err)
-			} else if switched {
-				return
 			}
 		} else {
 			e.onErr(client, update.Update, errors.New("callback query handler not found: "+data[0]))
@@ -305,6 +310,10 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 	userID int64, handler *StaticMenu[User], client *tgbotapi.TelegramBot, update *StateUpdate[User]) {
 
 	for _, middleware := range handler.middlewares {
+		if middleware == nil {
+			continue
+		}
+
 		if target, ok := middleware(client, update); !ok {
 			if target != "" {
 				if err := e.switchState(userID, target, client, update); err != nil {
@@ -316,20 +325,22 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 		}
 	}
 
+	actionBuilder := handler.processActionBuilder(client, update)
+
 	if update.Update.Message != nil && update.Update.Message.Text != "" {
 		if !update.IsSwitched {
 			buttonText := update.Update.Message.Text
 
-			if update.language != nil && handler.actionBuilder != nil {
-				if languageValueKeys := handler.actionBuilder.languageValueButtonKeys(update.language); languageValueKeys != nil {
+			if update.language != nil && actionBuilder != nil {
+				if languageValueKeys := actionBuilder.languageValueButtonKeys(update.language); languageValueKeys != nil {
 					if languageValueKey := languageValueKeys[buttonText]; languageValueKey != "" {
 						buttonText = languageValueKey
 					}
 				}
 			}
 
-			if handler.actionBuilder != nil {
-				if buttonAction := handler.actionBuilder.getButtonByButton(buttonText); buttonAction != nil {
+			if actionBuilder != nil {
+				if buttonAction := actionBuilder.getButtonByButton(buttonText); buttonAction != nil {
 					var err error
 
 					shouldStop := true
@@ -388,48 +399,20 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 
 	var replyMarkup *structs.ReplyKeyboardMarkup
 
-	if handler.actionBuilder != nil {
-		replyMarkup = handler.actionBuilder.buildButtons(update.language)
+	if actionBuilder != nil {
+		replyMarkup = actionBuilder.buildButtons(update.language)
 	}
 
-	if replyText := handler.getReplyText(); replyText != "" {
-		cfg := client.Message().SetText(replyText).SetChatId(userID)
-		if replyMarkup != nil {
-			cfg = cfg.SetReplyMarkup(replyMarkup)
-		}
-		_, err := client.Send(cfg)
+	if replyText := handler.processReplyText(update); replyText != "" {
+		_, err := client.Send(client.Message().
+			SetText(replyText).
+			SetChatId(userID).
+			SetReplyMarkup(replyMarkup))
 		if err != nil {
 			e.onErr(client, update.Update,
 				fmt.Errorf("error_sending_message_to_user: %d, %w", userID, err))
 			return
 		}
-	}
-
-	if replyLanguageKey := handler.getReplyTextLanguageKey(); replyLanguageKey != "" {
-		var txt string
-		if update.language == nil {
-			txt = replyLanguageKey
-		} else {
-			result, err := update.language.Get(replyLanguageKey)
-			if err == nil {
-				txt = result
-			}
-		}
-
-		cfg := client.Message().SetText(txt).SetChatId(userID)
-		if replyMarkup != nil {
-			cfg = cfg.SetReplyMarkup(replyMarkup)
-		}
-		_, err := client.Send(cfg)
-		if err != nil {
-			e.onErr(client, update.Update,
-				fmt.Errorf("error_sending_message_to_user: %d, %w", userID, err))
-			return
-		}
-	}
-
-	if replyWithFunc := handler.getReplyWithFunc(); replyWithFunc != nil {
-		replyWithFunc(client, update)
 	}
 }
 
@@ -644,11 +627,8 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineCallbackHandler(
 				if err != nil {
 					return err
 				}
-				if switched, err := e.processSwitchAction(switchAction, update, client); err != nil {
-					return err
-				} else if switched {
-					return nil
-				}
+
+				return e.processSwitchAction(switchAction, update, client)
 			}
 
 			return errors.New("callback query handler not found")
@@ -659,18 +639,18 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineCallbackHandler(
 }
 
 func (e *EngineWithPrivateStateHandlers[User]) processSwitchAction(
-	action SwitchAction, update *StateUpdate[User], client *tgbotapi.TelegramBot) (bool, error) {
+	action SwitchAction, update *StateUpdate[User], client *tgbotapi.TelegramBot) error {
 
 	if action == nil {
-		return false, nil
+		return nil
 	}
 
 	switch sa := action.(type) {
 	case *SwitchActionState:
-		return true, e.switchState(update.Update.CallbackQuery.From.Id, action.target(), client, update)
+		return e.switchState(update.Update.CallbackQuery.From.Id, action.target(), client, update)
 	case *SwitchActionInlineMenu:
-		return true, e.processInlineHandler(action.target(), client, update, sa.edit)
+		return e.processInlineHandler(action.target(), client, update, sa.edit)
 	}
 
-	return true, errors.New("unknown switch action")
+	return errors.New("unknown switch action")
 }

@@ -8,7 +8,7 @@ import (
 type InlineMenu[User any] struct {
 	lock sync.Mutex
 
-	middlewares []func(*tgbotapi.TelegramBot, *StateUpdate[User]) bool
+	middlewares []InlineMiddleware[User]
 
 	replyText         string
 	deferredReplyText func(update *StateUpdate[User]) string
@@ -19,56 +19,62 @@ type InlineMenu[User any] struct {
 	deferredActionBuilder func(update *StateUpdate[User]) *InlineActionBuilder
 }
 
-func NewInlineMenuWithTextAndActionBuilder[User any](text string, builder *InlineActionBuilder) *InlineMenu[User] {
+type InlineMiddleware[User any] func(*tgbotapi.TelegramBot, *StateUpdate[User]) bool
+
+func NewInlineMenuWithTextAndActionBuilder[User any](
+	text string,
+	builder *InlineActionBuilder,
+	middlewares ...InlineMiddleware[User],
+) *InlineMenu[User] {
+
 	return &InlineMenu[User]{
 		replyText:           text,
 		inlineActionBuilder: builder,
+		middlewares:         middlewares,
 	}
 }
 
 func NewInlineMenuWithTextAndDeferredActionBuilder[User any](
-	text string, deferredBuilder func(update *StateUpdate[User]) *InlineActionBuilder) *InlineMenu[User] {
+	text string,
+	deferredBuilder func(update *StateUpdate[User]) *InlineActionBuilder,
+	middlewares ...InlineMiddleware[User],
+) *InlineMenu[User] {
 
 	return &InlineMenu[User]{
 		replyText:             text,
 		deferredActionBuilder: deferredBuilder,
+		middlewares:           middlewares,
 	}
 }
 
 func NewInlineMenuWithDeferredTextAndDeferredActionBuilder[User any](
 	deferredText func(update *StateUpdate[User]) string,
-	deferredBuilder func(update *StateUpdate[User]) *InlineActionBuilder) *InlineMenu[User] {
+	deferredBuilder func(update *StateUpdate[User]) *InlineActionBuilder,
+	middlewares ...InlineMiddleware[User],
+) *InlineMenu[User] {
 
 	return &InlineMenu[User]{
 		deferredReplyText:     deferredText,
 		deferredActionBuilder: deferredBuilder,
+		middlewares:           middlewares,
 	}
 }
 
 func NewInlineMenuWithDeferredTextAndActionBuilder[User any](
 	deferredText func(update *StateUpdate[User]) string,
-	builder *InlineActionBuilder) *InlineMenu[User] {
+	builder *InlineActionBuilder,
+	middlewares ...InlineMiddleware[User],
+) *InlineMenu[User] {
 
 	return &InlineMenu[User]{
 		deferredReplyText:   deferredText,
 		inlineActionBuilder: builder,
+		middlewares:         middlewares,
 	}
 }
 
-// AddMiddleware adds a middleware to the inline menu
-func (i *InlineMenu[User]) AddMiddleware(
-	middleware func(*tgbotapi.TelegramBot, *StateUpdate[User]) bool) *InlineMenu[User] {
-
-	i.lock.Lock()
-	defer i.lock.Unlock()
-
-	i.middlewares = append(i.middlewares, middleware)
-
-	return i
-}
-
 // getMiddlewares returns the middlewares.
-func (i *InlineMenu[User]) getMiddlewares() []func(bot *tgbotapi.TelegramBot, update *StateUpdate[User]) bool {
+func (i *InlineMenu[User]) getMiddlewares() []InlineMiddleware[User] {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 

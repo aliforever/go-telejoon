@@ -81,18 +81,14 @@ func TestStart(t *testing.T) {
 						telejoon.NewOptions().SetErrorGroupID(81997375)).
 						WithLanguageConfig(languageConfig).
 						AddStaticMenu("Welcome",
-							telejoon.NewStaticMenu[ExampleUser]().
-								AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (string, bool) {
-									update.Set("name", "Ali")
-
-									return "", true
-								}).
-								WithStaticActionBuilder(telejoon.NewActionBuilder().
+							telejoon.NewStaticMenuWithLanguageKeyAndActionBuilderAndDynamicHandlers[ExampleUser](
+								"Welcome.Main",
+								telejoon.NewActionBuilder().
 									AddStateButtonT("Welcome.ChangeLanguageBtn", "ChangeLanguage").
 									AddTextButton("Hello", "You said Hello").
 									AddStateButton("Info State", "Info").
-									AddInlineMenuButton("Info", "Info")).
-								WithDynamicHandlers(telejoon.NewDynamicHandlers[ExampleUser]().
+									AddInlineMenuButton("Info", "Info"),
+								telejoon.NewDynamicHandlers[ExampleUser]().
 									WithTextHandler(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (string, bool) {
 										if update.Update.Message.Text == "Hello Bro" {
 											client.Send(client.Message().SetChatId(update.User.Id).
@@ -106,12 +102,17 @@ func TestStart(t *testing.T) {
 										}
 
 										return "", true
-									})).
-								ReplyWithLanguageKey("Welcome.Main")).
-						AddStaticMenu("Info", telejoon.NewStaticMenu[ExampleUser]().
-							WithStaticActionBuilder(telejoon.NewActionBuilder().
-								AddStateButtonT("Global.Back", "Welcome")).
-							ReplyWithLanguageKey("Info.Hello")).
+									}),
+								func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (string, bool) {
+									update.Set("name", "Ali")
+
+									return "", true
+								},
+							)).
+						AddStaticMenu("Info", telejoon.NewStaticMenuWithLanguageKeyAndActionBuilder[ExampleUser](
+							"Info.Hello",
+							telejoon.NewActionBuilder().
+								AddStateButtonT("Global.Back", "Welcome"))).
 						AddInlineMenu("Info", telejoon.
 							NewInlineMenuWithTextAndActionBuilder[ExampleUser]("Info Inline Menu",
 							telejoon.NewInlineActionBuilder().
