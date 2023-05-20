@@ -382,13 +382,13 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 			}
 
 			if handler.dynamicHandlers != nil && handler.dynamicHandlers.textHandler != nil {
-				if nextState, next := handler.dynamicHandlers.textHandler(client, update); nextState != "" {
-					err := e.switchState(userID, nextState, client, update)
-					if err != nil {
-						e.onErr(client, update.Update, err)
-					}
+				switchAction, next := handler.dynamicHandlers.textHandler(client, update)
+				if err := e.processSwitchAction(switchAction, update, client); err != nil {
+					e.onErr(client, update.Update, err)
 					return
-				} else if !next {
+				}
+
+				if !next {
 					return
 				}
 			}

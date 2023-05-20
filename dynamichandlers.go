@@ -7,20 +7,24 @@ import tgbotapi "github.com/aliforever/go-telegram-bot-api"
 // it either returns an empty string or a string that represents the next state
 // returning false means the update shouldn't be processed
 type dynamicHandlers[User any] struct {
-	textHandler      func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)
-	photoHandler     func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)
-	audioHandler     func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)
-	documentHandler  func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)
-	stickerHandler   func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)
-	videoHandler     func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)
-	voiceHandler     func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)
-	locationHandler  func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)
-	contactHandler   func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)
-	videoNoteHandler func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)
-	venueHandler     func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)
-	pollHandler      func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)
-	diceHandler      func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)
+	textHandler      DynamicHandler[User]
+	photoHandler     DynamicHandler[User]
+	audioHandler     DynamicHandler[User]
+	documentHandler  DynamicHandler[User]
+	stickerHandler   DynamicHandler[User]
+	videoHandler     DynamicHandler[User]
+	voiceHandler     DynamicHandler[User]
+	locationHandler  DynamicHandler[User]
+	contactHandler   DynamicHandler[User]
+	videoNoteHandler DynamicHandler[User]
+	venueHandler     DynamicHandler[User]
+	pollHandler      DynamicHandler[User]
+	diceHandler      DynamicHandler[User]
 }
+
+type (
+	DynamicHandler[User any] func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (SwitchAction, bool)
+)
 
 // NewDynamicHandlers creates a new DynamicHandlers.
 func NewDynamicHandlers[User any]() *dynamicHandlers[User] {
@@ -29,7 +33,7 @@ func NewDynamicHandlers[User any]() *dynamicHandlers[User] {
 
 // WithTextHandler sets the textHandler handler.
 func (d *dynamicHandlers[User]) WithTextHandler(
-	textHandler func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)) *dynamicHandlers[User] {
+	textHandler DynamicHandler[User]) *dynamicHandlers[User] {
 
 	d.textHandler = textHandler
 
@@ -38,7 +42,7 @@ func (d *dynamicHandlers[User]) WithTextHandler(
 
 // WithPhotoHandler sets the photoHandler handler.
 func (d *dynamicHandlers[User]) WithPhotoHandler(
-	photoHandler func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)) *dynamicHandlers[User] {
+	photoHandler DynamicHandler[User]) *dynamicHandlers[User] {
 
 	d.photoHandler = photoHandler
 
@@ -47,7 +51,7 @@ func (d *dynamicHandlers[User]) WithPhotoHandler(
 
 // WithAudioHandler sets the audioHandler handler.
 func (d *dynamicHandlers[User]) WithAudioHandler(
-	audioHandler func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)) *dynamicHandlers[User] {
+	audioHandler DynamicHandler[User]) *dynamicHandlers[User] {
 
 	d.audioHandler = audioHandler
 
@@ -56,7 +60,7 @@ func (d *dynamicHandlers[User]) WithAudioHandler(
 
 // WithDocumentHandler sets the documentHandler handler.
 func (d *dynamicHandlers[User]) WithDocumentHandler(
-	documentHandler func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)) *dynamicHandlers[User] {
+	documentHandler DynamicHandler[User]) *dynamicHandlers[User] {
 
 	d.documentHandler = documentHandler
 
@@ -65,7 +69,7 @@ func (d *dynamicHandlers[User]) WithDocumentHandler(
 
 // WithStickerHandler sets the stickerHandler handler.
 func (d *dynamicHandlers[User]) WithStickerHandler(
-	stickerHandler func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)) *dynamicHandlers[User] {
+	stickerHandler DynamicHandler[User]) *dynamicHandlers[User] {
 
 	d.stickerHandler = stickerHandler
 
@@ -74,7 +78,7 @@ func (d *dynamicHandlers[User]) WithStickerHandler(
 
 // WithVideoHandler sets the videoHandler handler.
 func (d *dynamicHandlers[User]) WithVideoHandler(
-	videoHandler func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)) *dynamicHandlers[User] {
+	videoHandler DynamicHandler[User]) *dynamicHandlers[User] {
 
 	d.videoHandler = videoHandler
 
@@ -83,7 +87,7 @@ func (d *dynamicHandlers[User]) WithVideoHandler(
 
 // WithVoiceHandler sets the voiceHandler handler.
 func (d *dynamicHandlers[User]) WithVoiceHandler(
-	voiceHandler func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)) *dynamicHandlers[User] {
+	voiceHandler DynamicHandler[User]) *dynamicHandlers[User] {
 
 	d.voiceHandler = voiceHandler
 
@@ -92,7 +96,7 @@ func (d *dynamicHandlers[User]) WithVoiceHandler(
 
 // WithVideoNoteHandler sets the videoNoteHandler handler.
 func (d *dynamicHandlers[User]) WithVideoNoteHandler(
-	videoNoteHandler func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)) *dynamicHandlers[User] {
+	videoNoteHandler DynamicHandler[User]) *dynamicHandlers[User] {
 
 	d.videoNoteHandler = videoNoteHandler
 
@@ -101,7 +105,7 @@ func (d *dynamicHandlers[User]) WithVideoNoteHandler(
 
 // WithContactHandler sets the contactHandler handler.
 func (d *dynamicHandlers[User]) WithContactHandler(
-	contactHandler func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)) *dynamicHandlers[User] {
+	contactHandler DynamicHandler[User]) *dynamicHandlers[User] {
 
 	d.contactHandler = contactHandler
 
@@ -110,7 +114,7 @@ func (d *dynamicHandlers[User]) WithContactHandler(
 
 // WithLocationHandler sets the locationHandler handler.
 func (d *dynamicHandlers[User]) WithLocationHandler(
-	locationHandler func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)) *dynamicHandlers[User] {
+	locationHandler DynamicHandler[User]) *dynamicHandlers[User] {
 
 	d.locationHandler = locationHandler
 
@@ -119,7 +123,7 @@ func (d *dynamicHandlers[User]) WithLocationHandler(
 
 // WithVenueHandler sets the venueHandler handler.
 func (d *dynamicHandlers[User]) WithVenueHandler(
-	venueHandler func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)) *dynamicHandlers[User] {
+	venueHandler DynamicHandler[User]) *dynamicHandlers[User] {
 
 	d.venueHandler = venueHandler
 
@@ -128,7 +132,7 @@ func (d *dynamicHandlers[User]) WithVenueHandler(
 
 // WithPollHandler sets the pollHandler handler.
 func (d *dynamicHandlers[User]) WithPollHandler(
-	pollHandler func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)) *dynamicHandlers[User] {
+	pollHandler DynamicHandler[User]) *dynamicHandlers[User] {
 
 	d.pollHandler = pollHandler
 
@@ -137,7 +141,7 @@ func (d *dynamicHandlers[User]) WithPollHandler(
 
 // WithDiceHandler sets the diceHandler handler.
 func (d *dynamicHandlers[User]) WithDiceHandler(
-	diceHandler func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)) *dynamicHandlers[User] {
+	diceHandler DynamicHandler[User]) *dynamicHandlers[User] {
 
 	d.diceHandler = diceHandler
 
