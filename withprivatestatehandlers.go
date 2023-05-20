@@ -314,11 +314,9 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 			continue
 		}
 
-		if target, ok := middleware(client, update); !ok {
-			if target != "" {
-				if err := e.switchState(userID, target, client, update); err != nil {
-					e.onErr(client, update.Update, err)
-				}
+		if switchAction, ok := middleware(client, update); !ok {
+			if err := e.processSwitchAction(switchAction, update, client); err != nil {
+				e.onErr(client, update.Update, err)
 			}
 
 			return

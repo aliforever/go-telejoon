@@ -22,7 +22,7 @@ type StaticMenu[User any] struct {
 }
 
 type (
-	StaticMenuMiddleware[User any]  func(*tgbotapi.TelegramBot, *StateUpdate[User]) (string, bool)
+	StaticMenuMiddleware[User any]  func(*tgbotapi.TelegramBot, *StateUpdate[User]) (SwitchAction, bool)
 	DeferredActionBuilder[User any] func(bot *tgbotapi.TelegramBot, update *StateUpdate[User]) *ActionBuilder
 	DeferredTextBuilder[User any]   func(update *StateUpdate[User]) string
 )
