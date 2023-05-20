@@ -104,7 +104,7 @@ func (e *EngineWithPrivateStateHandlers[User]) WithLanguageConfig(
 		text += fmt.Sprintf("%s\n", txt)
 	}
 
-	deferredStaticActionBuilder := func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) *ActionBuilder {
+	deferredStaticActionBuilder := func(update *StateUpdate[User]) *ActionBuilder {
 		actions := NewActionBuilder()
 
 		for i := range cfg.languages.localizers {
@@ -115,13 +115,41 @@ func (e *EngineWithPrivateStateHandlers[User]) WithLanguageConfig(
 				btnText = lang.tag
 			}
 
-			actions.AddCustomButton(NewChooseLanguageButton[User](btnText, e, update, cfg, &lang, client))
+			actions.AddRawButton(btnText)
 		}
 
 		return actions
 	}
 
-	menu := NewStaticMenuWithTextAndDeferredActionBuilder(text, deferredStaticActionBuilder)
+	deferredDynamicTextBuilder := NewDynamicTextHandler(func(
+		client *tgbotapi.TelegramBot, update *StateUpdate[User]) (SwitchAction, bool) {
+
+		for i := range cfg.languages.localizers {
+			lang := cfg.languages.localizers[i]
+
+			btnText, _ := lang.Get(fmt.Sprintf("%s.Button", cfg.changeLanguageState))
+			if btnText == "" {
+				btnText = lang.tag
+			}
+
+			if update.Update.Message.Text == btnText {
+				err := e.languageConfig.repo.SetUserLanguage(update.Update.From().Id, lang.tag)
+				if err != nil {
+					e.engine.onErr(client, update.Update, err)
+					return nil, false
+				}
+
+				update.SetLanguage(&lang)
+
+				return NewSwitchActionState(e.defaultStateName), false
+			}
+		}
+
+		return nil, true
+	})
+
+	menu := NewStaticMenuWithTextAndDeferredActionBuilderAndDynamicHandlers(
+		text, deferredStaticActionBuilder, NewDynamicHandlers(deferredDynamicTextBuilder))
 
 	return e.AddStaticMenu(cfg.changeLanguageState, menu)
 }
@@ -323,7 +351,7 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 		}
 	}
 
-	actionBuilder := handler.processActionBuilder(client, update)
+	actionBuilder := handler.processActionBuilder(update)
 
 	if update.Update.Message != nil && update.Update.Message.Text != "" {
 		if !update.IsSwitched {
@@ -645,7 +673,7 @@ func (e *EngineWithPrivateStateHandlers[User]) processSwitchAction(
 
 	switch sa := action.(type) {
 	case *SwitchActionState:
-		return e.switchState(update.Update.CallbackQuery.From.Id, action.target(), client, update)
+		return e.switchState(update.Update.From().Id, action.target(), client, update)
 	case *SwitchActionInlineMenu:
 		return e.processInlineHandler(action.target(), client, update, sa.edit)
 	}

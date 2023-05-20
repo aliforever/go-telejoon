@@ -1,7 +1,6 @@
 package telejoon
 
 import (
-	tgbotapi "github.com/aliforever/go-telegram-bot-api"
 	"github.com/aliforever/go-telegram-bot-api/structs"
 	"github.com/aliforever/go-telegram-bot-api/tools"
 	"sync"
@@ -532,49 +531,4 @@ func (b *ActionBuilder) languageValueButtonKeys(language *Language) map[string]s
 	}
 
 	return valueKeys
-}
-
-// chooseLanguageButton implements the Action interface.
-type chooseLanguageButton[User any] struct {
-	button         string
-	engine         *EngineWithPrivateStateHandlers[User]
-	client         *tgbotapi.TelegramBot
-	update         *StateUpdate[User]
-	languageConfig *LanguageConfig
-	localizer      *Language
-}
-
-// NewChooseLanguageButton creates a new chooseLanguageButton.
-func NewChooseLanguageButton[User any](
-	button string, engine *EngineWithPrivateStateHandlers[User], update *StateUpdate[User], lang *LanguageConfig,
-	localizer *Language, client *tgbotapi.TelegramBot) Action {
-
-	return chooseLanguageButton[User]{
-		button:         button,
-		engine:         engine,
-		languageConfig: lang,
-		client:         client,
-		update:         update,
-		localizer:      localizer,
-	}
-}
-
-func (c chooseLanguageButton[User]) Name() string {
-	return c.button
-}
-
-func (c chooseLanguageButton[User]) Kind() ActionKind {
-	return ActionKindState
-}
-
-func (c chooseLanguageButton[User]) Result() string {
-	err := c.languageConfig.repo.SetUserLanguage(c.update.Update.From().Id, c.localizer.tag)
-	if err != nil {
-		c.engine.onErr(c.client, c.update.Update, err)
-		return ""
-	}
-
-	c.update.SetLanguage(c.localizer)
-
-	return c.engine.defaultStateName
 }
