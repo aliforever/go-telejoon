@@ -88,8 +88,8 @@ func TestStart(t *testing.T) {
 									AddTextButton("Hello", "You said Hello").
 									AddStateButton("Info State", "Info").
 									AddInlineMenuButton("Info", "Info"),
-								telejoon.NewDynamicHandlers[ExampleUser]().
-									WithTextHandler(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (string, bool) {
+								telejoon.NewDynamicHandlers[ExampleUser](
+									telejoon.NewDynamicTextHandler(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (telejoon.SwitchAction, bool) {
 										if update.Update.Message.Text == "Hello Bro" {
 											client.Send(client.Message().SetChatId(update.User.Id).
 												SetText("Hello Bro!"))
@@ -98,15 +98,16 @@ func TestStart(t *testing.T) {
 											fmt.Println("changing name to:", "Ali 2")
 											update.Set("name", "Ali 2")
 
-											return "", false
+											return nil, false
 										}
 
-										return "", true
+										return nil, true
 									}),
-								func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (string, bool) {
+								),
+								func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate[ExampleUser]) (telejoon.SwitchAction, bool) {
 									update.Set("name", "Ali")
 
-									return "", true
+									return nil, true
 								},
 							)).
 						AddStaticMenu("Info", telejoon.NewStaticMenuWithLanguageKeyAndActionBuilder[ExampleUser](

@@ -16,7 +16,7 @@ type StaticMenu[User any] struct {
 	actionBuilder         *ActionBuilder
 	deferredActionBuilder DeferredActionBuilder[User]
 
-	dynamicHandlers *dynamicHandlers[User]
+	dynamicHandlers *DynamicHandlers[User]
 
 	middlewares []StaticMenuMiddleware[User]
 }
@@ -45,7 +45,7 @@ func NewStaticMenuWithTextAndActionBuilder[User any](
 func NewStaticMenuWithTextAndActionBuilderAndDynamicHandlers[User any](
 	text string,
 	builder *ActionBuilder,
-	dynamicHandlers *dynamicHandlers[User],
+	dynamicHandlers *DynamicHandlers[User],
 	middlewares ...StaticMenuMiddleware[User]) *StaticMenu[User] {
 
 	return &StaticMenu[User]{
@@ -75,7 +75,7 @@ func NewStaticMenuWithLanguageKeyAndActionBuilder[User any](
 func NewStaticMenuWithLanguageKeyAndActionBuilderAndDynamicHandlers[User any](
 	key string,
 	builder *ActionBuilder,
-	dynamicHandlers *dynamicHandlers[User],
+	dynamicHandlers *DynamicHandlers[User],
 	middlewares ...StaticMenuMiddleware[User]) *StaticMenu[User] {
 
 	return &StaticMenu[User]{
@@ -105,7 +105,7 @@ func NewStaticMenuWithTextAndDeferredActionBuilder[User any](
 func NewStaticMenuWithTextAndDeferredActionBuilderAndDynamicHandlers[User any](
 	text string,
 	deferredBuilder DeferredActionBuilder[User],
-	dynamicHandlers *dynamicHandlers[User],
+	dynamicHandlers *DynamicHandlers[User],
 	middlewares ...StaticMenuMiddleware[User]) *StaticMenu[User] {
 
 	return &StaticMenu[User]{
@@ -135,7 +135,7 @@ func NewStaticMenuWithLanguageKeyAndDeferredActionBuilder[User any](
 func NewStaticMenuWithLanguageKeyAndDeferredActionBuilderAndDynamicHandlers[User any](
 	key string,
 	deferredBuilder DeferredActionBuilder[User],
-	dynamicHandlers *dynamicHandlers[User],
+	dynamicHandlers *DynamicHandlers[User],
 	middlewares ...StaticMenuMiddleware[User]) *StaticMenu[User] {
 
 	return &StaticMenu[User]{
@@ -165,7 +165,7 @@ func NewStaticMenuWithDeferredTextAndActionBuilder[User any](
 func NewStaticMenuWithDeferredTextAndActionBuilderAndDynamicHandlers[User any](
 	deferredText DeferredTextBuilder[User],
 	builder *ActionBuilder,
-	dynamicHandlers *dynamicHandlers[User],
+	dynamicHandlers *DynamicHandlers[User],
 	middlewares ...StaticMenuMiddleware[User]) *StaticMenu[User] {
 
 	return &StaticMenu[User]{
@@ -195,7 +195,7 @@ func NewStaticMenuWithDeferredTextAndDeferredActionBuilder[User any](
 func NewStaticMenuWithDeferredTextAndDeferredActionBuilderAndDynamicHandlers[User any](
 	deferredText DeferredTextBuilder[User],
 	deferredBuilder DeferredActionBuilder[User],
-	dynamicHandlers *dynamicHandlers[User],
+	dynamicHandlers *DynamicHandlers[User],
 	middlewares ...StaticMenuMiddleware[User]) *StaticMenu[User] {
 
 	return &StaticMenu[User]{
@@ -209,7 +209,7 @@ func NewStaticMenuWithDeferredTextAndDeferredActionBuilderAndDynamicHandlers[Use
 // NewStaticMenuWithTextAndDynamicHandlers creates a new StaticMenu[User] with the given text and dynamic handlers.
 func NewStaticMenuWithTextAndDynamicHandlers[User any](
 	text string,
-	handlers *dynamicHandlers[User],
+	handlers *DynamicHandlers[User],
 	middlewares ...StaticMenuMiddleware[User]) *StaticMenu[User] {
 
 	return &StaticMenu[User]{
@@ -223,7 +223,7 @@ func NewStaticMenuWithTextAndDynamicHandlers[User any](
 // dynamic handlers.
 func NewStaticMenuWithLanguageKeyAndDynamicHandlers[User any](
 	key string,
-	handlers *dynamicHandlers[User],
+	handlers *DynamicHandlers[User],
 	middlewares ...StaticMenuMiddleware[User]) *StaticMenu[User] {
 
 	return &StaticMenu[User]{
@@ -237,7 +237,7 @@ func NewStaticMenuWithLanguageKeyAndDynamicHandlers[User any](
 // dynamic handlers.
 func NewStaticMenuWithDeferredTextAndDynamicHandlers[User any](
 	deferredText DeferredTextBuilder[User],
-	handlers *dynamicHandlers[User],
+	handlers *DynamicHandlers[User],
 	middlewares ...StaticMenuMiddleware[User]) *StaticMenu[User] {
 
 	return &StaticMenu[User]{

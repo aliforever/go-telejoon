@@ -2,148 +2,201 @@ package telejoon
 
 import tgbotapi "github.com/aliforever/go-telegram-bot-api"
 
+const (
+	dynamicHandlerText      = "TEXT"
+	dynamicHandlerPhoto     = "PHOTO"
+	dynamicHandlerAudio     = "AUDIO"
+	dynamicHandlerDocument  = "DOCUMENT"
+	dynamicHandlerSticker   = "STICKER"
+	dynamicHandlerVideo     = "VIDEO"
+	dynamicHandlerVoice     = "VOICE"
+	dynamicHandlerLocation  = "LOCATION"
+	dynamicHandlerContact   = "CONTACT"
+	dynamicHandlerVideoNote = "VIDEO_NOTE"
+	dynamicHandlerVenue     = "VENUE"
+	dynamicHandlerPoll      = "POLL"
+	dynamicHandlerDice      = "DICE"
+)
+
 // DynamicHandlers is a struct that holds all the dynamic handlers
 // for example: text, photo, audio, document, sticker, video, voice, location, contact, video_note, venue, poll, dice
 // it either returns an empty string or a string that represents the next state
 // returning false means the update shouldn't be processed
-type dynamicHandlers[User any] struct {
-	textHandler      DynamicHandler[User]
-	photoHandler     DynamicHandler[User]
-	audioHandler     DynamicHandler[User]
-	documentHandler  DynamicHandler[User]
-	stickerHandler   DynamicHandler[User]
-	videoHandler     DynamicHandler[User]
-	voiceHandler     DynamicHandler[User]
-	locationHandler  DynamicHandler[User]
-	contactHandler   DynamicHandler[User]
-	videoNoteHandler DynamicHandler[User]
-	venueHandler     DynamicHandler[User]
-	pollHandler      DynamicHandler[User]
-	diceHandler      DynamicHandler[User]
+type DynamicHandlers[User any] struct {
+	handlers map[string]DynamicHandlerFunc[User]
 }
 
-type (
-	DynamicHandler[User any] func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (SwitchAction, bool)
-)
+type DynamicHandler[User any] struct {
+	kind    string
+	handler DynamicHandlerFunc[User]
+}
+
+type DynamicHandlerFunc[User any] func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (SwitchAction, bool)
 
 // NewDynamicHandlers creates a new DynamicHandlers.
-func NewDynamicHandlers[User any]() *dynamicHandlers[User] {
-	return &dynamicHandlers[User]{}
+func NewDynamicHandlers[User any](handlers ...*DynamicHandler[User]) *DynamicHandlers[User] {
+	dynamicHandlers := &DynamicHandlers[User]{
+		handlers: make(map[string]DynamicHandlerFunc[User]),
+	}
+
+	for i := range handlers {
+		handler := handlers[i]
+		if handler != nil {
+			dynamicHandlers.handlers[handler.kind] = handler.handler
+		}
+	}
+
+	return dynamicHandlers
 }
 
-// WithTextHandler sets the textHandler handler.
-func (d *dynamicHandlers[User]) WithTextHandler(
-	textHandler DynamicHandler[User]) *dynamicHandlers[User] {
+// Process processes the given update and returns the next state.
+func (d *DynamicHandlers[User]) Process(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (SwitchAction, bool) {
+	if update.Update.Message == nil {
+		return nil, false
+	}
 
-	d.textHandler = textHandler
+	if update.Update.Message.Text != "" {
+		if handler, ok := d.handlers[dynamicHandlerText]; ok {
+			return handler(client, update)
+		}
+	}
 
-	return d
+	if update.Update.Message.Photo != nil {
+		if handler, ok := d.handlers[dynamicHandlerPhoto]; ok {
+			return handler(client, update)
+		}
+	}
+
+	if update.Update.Message.Audio != nil {
+		if handler, ok := d.handlers[dynamicHandlerAudio]; ok {
+			return handler(client, update)
+		}
+	}
+
+	if update.Update.Message.Document != nil {
+		if handler, ok := d.handlers[dynamicHandlerDocument]; ok {
+			return handler(client, update)
+		}
+	}
+
+	if update.Update.Message.Sticker != nil {
+		if handler, ok := d.handlers[dynamicHandlerSticker]; ok {
+			return handler(client, update)
+		}
+	}
+
+	if update.Update.Message.Video != nil {
+		if handler, ok := d.handlers[dynamicHandlerVideo]; ok {
+			return handler(client, update)
+		}
+	}
+
+	if update.Update.Message.Voice != nil {
+		if handler, ok := d.handlers[dynamicHandlerVoice]; ok {
+			return handler(client, update)
+		}
+	}
+
+	if update.Update.Message.Location != nil {
+		if handler, ok := d.handlers[dynamicHandlerLocation]; ok {
+			return handler(client, update)
+		}
+	}
+
+	if update.Update.Message.Contact != nil {
+		if handler, ok := d.handlers[dynamicHandlerContact]; ok {
+			return handler(client, update)
+		}
+	}
+
+	if update.Update.Message.VideoNote != nil {
+		if handler, ok := d.handlers[dynamicHandlerVideoNote]; ok {
+			return handler(client, update)
+		}
+	}
+
+	if update.Update.Message.Venue != nil {
+		if handler, ok := d.handlers[dynamicHandlerVenue]; ok {
+			return handler(client, update)
+		}
+	}
+
+	if update.Update.Message.Poll != nil {
+		if handler, ok := d.handlers[dynamicHandlerPoll]; ok {
+			return handler(client, update)
+		}
+	}
+
+	// if update.Update.Message.Dice != nil {
+	// 	if handler, ok := d.handlers[dynamicHandlerDice]; ok {
+	// 		return handler(client, update)
+	// 	}
+	// }
+
+	return nil, false
 }
 
-// WithPhotoHandler sets the photoHandler handler.
-func (d *dynamicHandlers[User]) WithPhotoHandler(
-	photoHandler DynamicHandler[User]) *dynamicHandlers[User] {
-
-	d.photoHandler = photoHandler
-
-	return d
+// NewDynamicTextHandler creates a new DynamicHandler[User] with the given text handler.
+func NewDynamicTextHandler[User any](textHandler DynamicHandlerFunc[User]) *DynamicHandler[User] {
+	return &DynamicHandler[User]{kind: dynamicHandlerText, handler: textHandler}
 }
 
-// WithAudioHandler sets the audioHandler handler.
-func (d *dynamicHandlers[User]) WithAudioHandler(
-	audioHandler DynamicHandler[User]) *dynamicHandlers[User] {
-
-	d.audioHandler = audioHandler
-
-	return d
+// NewDynamicPhotoHandler creates a new DynamicHandler[User] with the given photo handler.
+func NewDynamicPhotoHandler[User any](photoHandler DynamicHandlerFunc[User]) *DynamicHandler[User] {
+	return &DynamicHandler[User]{kind: dynamicHandlerPhoto, handler: photoHandler}
 }
 
-// WithDocumentHandler sets the documentHandler handler.
-func (d *dynamicHandlers[User]) WithDocumentHandler(
-	documentHandler DynamicHandler[User]) *dynamicHandlers[User] {
-
-	d.documentHandler = documentHandler
-
-	return d
+// NewDynamicAudioHandler creates a new DynamicHandler[User] with the given audio handler.
+func NewDynamicAudioHandler[User any](audioHandler DynamicHandlerFunc[User]) *DynamicHandler[User] {
+	return &DynamicHandler[User]{kind: dynamicHandlerAudio, handler: audioHandler}
 }
 
-// WithStickerHandler sets the stickerHandler handler.
-func (d *dynamicHandlers[User]) WithStickerHandler(
-	stickerHandler DynamicHandler[User]) *dynamicHandlers[User] {
-
-	d.stickerHandler = stickerHandler
-
-	return d
+// NewDynamicDocumentHandler creates a new DynamicHandler[User] with the given document handler.
+func NewDynamicDocumentHandler[User any](documentHandler DynamicHandlerFunc[User]) *DynamicHandler[User] {
+	return &DynamicHandler[User]{kind: dynamicHandlerDocument, handler: documentHandler}
 }
 
-// WithVideoHandler sets the videoHandler handler.
-func (d *dynamicHandlers[User]) WithVideoHandler(
-	videoHandler DynamicHandler[User]) *dynamicHandlers[User] {
-
-	d.videoHandler = videoHandler
-
-	return d
+// NewDynamicStickerHandler creates a new DynamicHandler[User] with the given sticker handler.
+func NewDynamicStickerHandler[User any](stickerHandler DynamicHandlerFunc[User]) *DynamicHandler[User] {
+	return &DynamicHandler[User]{kind: dynamicHandlerSticker, handler: stickerHandler}
 }
 
-// WithVoiceHandler sets the voiceHandler handler.
-func (d *dynamicHandlers[User]) WithVoiceHandler(
-	voiceHandler DynamicHandler[User]) *dynamicHandlers[User] {
-
-	d.voiceHandler = voiceHandler
-
-	return d
+// NewDynamicVideoHandler creates a new DynamicHandler[User] with the given video handler.
+func NewDynamicVideoHandler[User any](videoHandler DynamicHandlerFunc[User]) *DynamicHandler[User] {
+	return &DynamicHandler[User]{kind: dynamicHandlerVideo, handler: videoHandler}
 }
 
-// WithVideoNoteHandler sets the videoNoteHandler handler.
-func (d *dynamicHandlers[User]) WithVideoNoteHandler(
-	videoNoteHandler DynamicHandler[User]) *dynamicHandlers[User] {
-
-	d.videoNoteHandler = videoNoteHandler
-
-	return d
+// NewDynamicVoiceHandler creates a new DynamicHandler[User] with the given voice handler.
+func NewDynamicVoiceHandler[User any](voiceHandler DynamicHandlerFunc[User]) *DynamicHandler[User] {
+	return &DynamicHandler[User]{kind: dynamicHandlerVoice, handler: voiceHandler}
 }
 
-// WithContactHandler sets the contactHandler handler.
-func (d *dynamicHandlers[User]) WithContactHandler(
-	contactHandler DynamicHandler[User]) *dynamicHandlers[User] {
-
-	d.contactHandler = contactHandler
-
-	return d
+// NewDynamicVideoNoteHandler creates a new DynamicHandler[User] with the given video note handler.
+func NewDynamicVideoNoteHandler[User any](videoNoteHandler DynamicHandlerFunc[User]) *DynamicHandler[User] {
+	return &DynamicHandler[User]{kind: dynamicHandlerVideoNote, handler: videoNoteHandler}
 }
 
-// WithLocationHandler sets the locationHandler handler.
-func (d *dynamicHandlers[User]) WithLocationHandler(
-	locationHandler DynamicHandler[User]) *dynamicHandlers[User] {
-
-	d.locationHandler = locationHandler
-
-	return d
+// NewDynamicContactHandler creates a new DynamicHandler[User] with the given contact handler.
+func NewDynamicContactHandler[User any](contactHandler DynamicHandlerFunc[User]) *DynamicHandler[User] {
+	return &DynamicHandler[User]{kind: dynamicHandlerContact, handler: contactHandler}
 }
 
-// WithVenueHandler sets the venueHandler handler.
-func (d *dynamicHandlers[User]) WithVenueHandler(
-	venueHandler DynamicHandler[User]) *dynamicHandlers[User] {
-
-	d.venueHandler = venueHandler
-
-	return d
+// NewDynamicLocationHandler creates a new DynamicHandler[User] with the given location handler.
+func NewDynamicLocationHandler[User any](locationHandler DynamicHandlerFunc[User]) *DynamicHandler[User] {
+	return &DynamicHandler[User]{kind: dynamicHandlerLocation, handler: locationHandler}
 }
 
-// WithPollHandler sets the pollHandler handler.
-func (d *dynamicHandlers[User]) WithPollHandler(
-	pollHandler DynamicHandler[User]) *dynamicHandlers[User] {
-
-	d.pollHandler = pollHandler
-
-	return d
+// NewDynamicVenueHandler creates a new DynamicHandler[User] with the given venue handler.
+func NewDynamicVenueHandler[User any](venueHandler DynamicHandlerFunc[User]) *DynamicHandler[User] {
+	return &DynamicHandler[User]{kind: dynamicHandlerVenue, handler: venueHandler}
 }
 
-// WithDiceHandler sets the diceHandler handler.
-func (d *dynamicHandlers[User]) WithDiceHandler(
-	diceHandler DynamicHandler[User]) *dynamicHandlers[User] {
+// NewDynamicPollHandler creates a new DynamicHandler[User] with the given poll handler.
+func NewDynamicPollHandler[User any](pollHandler DynamicHandlerFunc[User]) *DynamicHandler[User] {
+	return &DynamicHandler[User]{kind: dynamicHandlerPoll, handler: pollHandler}
+}
 
-	d.diceHandler = diceHandler
-
-	return d
+// NewDynamicDiceHandler creates a new DynamicHandler[User] with the given dice handler.
+func NewDynamicDiceHandler[User any](diceHandler DynamicHandlerFunc[User]) *DynamicHandler[User] {
+	return &DynamicHandler[User]{kind: dynamicHandlerDice, handler: diceHandler}
 }
