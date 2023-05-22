@@ -31,3 +31,8 @@ func NewLanguageKeyText(key string) LanguageKeyTextBuilder {
 func NewStaticText(text string) StaticTextBuilder {
 	return StaticTextBuilder(text)
 }
+
+// NewDeferredText returns a new DeferredTextBuilder
+func NewDeferredText(text func(update *StateUpdate) string) DeferredTextBuilder {
+	return text
+}
