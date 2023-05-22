@@ -105,7 +105,7 @@ func (e *EngineWithPrivateStateHandlers) WithLanguageConfig(
 	}
 
 	deferredActionBuilder := NewDeferredActionBuilder(func(update *StateUpdate) *ActionBuilder {
-		actions := NewStaticActionHandler()
+		actions := NewStaticActionBuilder()
 
 		for i := range cfg.languages.localizers {
 			lang := cfg.languages.localizers[i]

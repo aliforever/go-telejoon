@@ -86,7 +86,7 @@ func TestStart(t *testing.T) {
 						AddStaticMenu("Welcome",
 							telejoon.NewStaticMenu(
 								telejoon.NewLanguageKeyText("Welcome.Main"),
-								telejoon.NewStaticActionHandler().
+								telejoon.NewStaticActionBuilder().
 									AddStateButtonT("Welcome.ChangeLanguageBtn", "ChangeLanguage").
 									AddTextButton("Hello", "You said Hello").
 									AddStateButton("Info State", "Info").
@@ -113,7 +113,7 @@ func TestStart(t *testing.T) {
 								))).
 						AddStaticMenu("Info", telejoon.NewStaticMenu(
 							telejoon.NewLanguageKeyText("Info.Hello"),
-							telejoon.NewStaticActionHandler().
+							telejoon.NewStaticActionBuilder().
 								AddStateButtonT("Global.Back", "Welcome"))).
 						AddInlineMenu("Info", telejoon.
 							NewInlineMenuWithTextAndActionBuilder("Info Inline Menu",

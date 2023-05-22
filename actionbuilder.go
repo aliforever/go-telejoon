@@ -202,8 +202,8 @@ type ActionBuilder struct {
 	maxButtonPerRow int
 }
 
-// NewStaticActionHandler creates a new ActionBuilder.
-func NewStaticActionHandler() *ActionBuilder {
+// NewStaticActionBuilder creates a new ActionBuilder.
+func NewStaticActionBuilder() *ActionBuilder {
 	return &ActionBuilder{
 		buttonOptions: make(map[string][]*ButtonOptions),
 	}
