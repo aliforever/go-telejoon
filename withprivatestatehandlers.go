@@ -343,11 +343,13 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 			continue
 		}
 
-		if switchAction, ok := middleware.Handle(client, update); !ok {
-			if err := e.processSwitchAction(switchAction, update, client); err != nil {
-				e.onErr(client, update.Update, err)
-			}
+		switchAction, pass := middleware.Handle(client, update)
+		if err := e.processSwitchAction(switchAction, update, client); err != nil {
+			e.onErr(client, update.Update, err)
+			return
+		}
 
+		if !pass {
 			return
 		}
 	}
@@ -411,13 +413,13 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 			}
 
 			if handler.dynamicHandlers != nil && handler.dynamicHandlers[TextHandler] != nil {
-				switchAction, next := handler.dynamicHandlers[TextHandler].Handle(client, update)
+				switchAction, pass := handler.dynamicHandlers[TextHandler].Handle(client, update)
 				if err := e.processSwitchAction(switchAction, update, client); err != nil {
 					e.onErr(client, update.Update, err)
 					return
 				}
 
-				if !next {
+				if !pass {
 					return
 				}
 			}
