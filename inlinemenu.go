@@ -5,68 +5,68 @@ import (
 	"sync"
 )
 
-type InlineMenu[User any] struct {
+type InlineMenu struct {
 	lock sync.Mutex
 
-	middlewares []InlineMiddleware[User]
+	middlewares []InlineMiddleware
 
 	replyText         string
-	deferredReplyText func(update *StateUpdate[User]) string
+	deferredReplyText func(update *StateUpdate) string
 
 	callbackPrefix string
 
 	inlineActionBuilder   *InlineActionBuilder
-	deferredActionBuilder func(update *StateUpdate[User]) *InlineActionBuilder
+	deferredActionBuilder func(update *StateUpdate) *InlineActionBuilder
 }
 
-type InlineMiddleware[User any] func(*tgbotapi.TelegramBot, *StateUpdate[User]) bool
+type InlineMiddleware func(*tgbotapi.TelegramBot, *StateUpdate) bool
 
-func NewInlineMenuWithTextAndActionBuilder[User any](
+func NewInlineMenuWithTextAndActionBuilder(
 	text string,
 	builder *InlineActionBuilder,
-	middlewares ...InlineMiddleware[User],
-) *InlineMenu[User] {
+	middlewares ...InlineMiddleware,
+) *InlineMenu {
 
-	return &InlineMenu[User]{
+	return &InlineMenu{
 		replyText:           text,
 		inlineActionBuilder: builder,
 		middlewares:         middlewares,
 	}
 }
 
-func NewInlineMenuWithTextAndDeferredActionBuilder[User any](
+func NewInlineMenuWithTextAndDeferredActionBuilder(
 	text string,
-	deferredBuilder func(update *StateUpdate[User]) *InlineActionBuilder,
-	middlewares ...InlineMiddleware[User],
-) *InlineMenu[User] {
+	deferredBuilder func(update *StateUpdate) *InlineActionBuilder,
+	middlewares ...InlineMiddleware,
+) *InlineMenu {
 
-	return &InlineMenu[User]{
+	return &InlineMenu{
 		replyText:             text,
 		deferredActionBuilder: deferredBuilder,
 		middlewares:           middlewares,
 	}
 }
 
-func NewInlineMenuWithDeferredTextAndDeferredActionBuilder[User any](
-	deferredText func(update *StateUpdate[User]) string,
-	deferredBuilder func(update *StateUpdate[User]) *InlineActionBuilder,
-	middlewares ...InlineMiddleware[User],
-) *InlineMenu[User] {
+func NewInlineMenuWithDeferredTextAndDeferredActionBuilder(
+	deferredText func(update *StateUpdate) string,
+	deferredBuilder func(update *StateUpdate) *InlineActionBuilder,
+	middlewares ...InlineMiddleware,
+) *InlineMenu {
 
-	return &InlineMenu[User]{
+	return &InlineMenu{
 		deferredReplyText:     deferredText,
 		deferredActionBuilder: deferredBuilder,
 		middlewares:           middlewares,
 	}
 }
 
-func NewInlineMenuWithDeferredTextAndActionBuilder[User any](
-	deferredText func(update *StateUpdate[User]) string,
+func NewInlineMenuWithDeferredTextAndActionBuilder(
+	deferredText func(update *StateUpdate) string,
 	builder *InlineActionBuilder,
-	middlewares ...InlineMiddleware[User],
-) *InlineMenu[User] {
+	middlewares ...InlineMiddleware,
+) *InlineMenu {
 
-	return &InlineMenu[User]{
+	return &InlineMenu{
 		deferredReplyText:   deferredText,
 		inlineActionBuilder: builder,
 		middlewares:         middlewares,
@@ -74,14 +74,14 @@ func NewInlineMenuWithDeferredTextAndActionBuilder[User any](
 }
 
 // getMiddlewares returns the middlewares.
-func (i *InlineMenu[User]) getMiddlewares() []InlineMiddleware[User] {
+func (i *InlineMenu) getMiddlewares() []InlineMiddleware {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
 	return i.middlewares
 }
 
-func (i *InlineMenu[User]) getActionBuilder() *InlineActionBuilder {
+func (i *InlineMenu) getActionBuilder() *InlineActionBuilder {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 
@@ -94,7 +94,7 @@ func (i *InlineMenu[User]) getActionBuilder() *InlineActionBuilder {
 	return i.inlineActionBuilder
 }
 
-func (i *InlineMenu[User]) getDeferredActionBuilder(update *StateUpdate[User]) *InlineActionBuilder {
+func (i *InlineMenu) getDeferredActionBuilder(update *StateUpdate) *InlineActionBuilder {
 	i.lock.Lock()
 	defer i.lock.Unlock()
 

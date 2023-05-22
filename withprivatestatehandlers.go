@@ -9,46 +9,46 @@ import (
 	"sync"
 )
 
-type EngineWithPrivateStateHandlers[User any] struct {
-	engine[User, any, any, any]
+type EngineWithPrivateStateHandlers struct {
+	engine
 
-	userRepository UserRepository[User]
+	userRepository UserRepository
 
 	m sync.Mutex
 
-	middlewares []func(client *tgbotapi.TelegramBot, update *StateUpdate[User]) (string, bool)
+	middlewares []UpdateHandler
 
 	defaultStateName string
 
-	staticMenus map[string]*StaticMenu[User]
+	staticMenus map[string]*StaticMenu
 
-	inlineMenus map[string]*InlineMenu[User]
+	inlineMenus map[string]*InlineMenu
 
 	callbackQueryHandlers map[string]func(
-		client *tgbotapi.TelegramBot, update *StateUpdate[User], args ...string) (SwitchAction, error)
+		client *tgbotapi.TelegramBot, update *StateUpdate, args ...string) (SwitchAction, error)
 
 	languageConfig *LanguageConfig
 }
 
-func WithPrivateStateHandlers[User any](
-	userRepo UserRepository[User], defaultState string, opts ...*Options) *EngineWithPrivateStateHandlers[User] {
+func WithPrivateStateHandlers(
+	userRepo UserRepository, defaultState string, opts ...*Options) *EngineWithPrivateStateHandlers {
 
-	return &EngineWithPrivateStateHandlers[User]{
-		engine: engine[User, any, any, any]{
+	return &EngineWithPrivateStateHandlers{
+		engine: engine{
 			opts: opts,
 		},
 		userRepository:   userRepo,
 		defaultStateName: defaultState,
-		staticMenus:      map[string]*StaticMenu[User]{},
-		inlineMenus:      map[string]*InlineMenu[User]{},
+		staticMenus:      map[string]*StaticMenu{},
+		inlineMenus:      map[string]*InlineMenu{},
 		callbackQueryHandlers: map[string]func(
-			*tgbotapi.TelegramBot, *StateUpdate[User], ...string) (SwitchAction, error){},
+			*tgbotapi.TelegramBot, *StateUpdate, ...string) (SwitchAction, error){},
 	}
 }
 
-// AddStaticMenu adds a static state handler
-func (e *EngineWithPrivateStateHandlers[User]) AddStaticMenu(
-	state string, handler *StaticMenu[User]) *EngineWithPrivateStateHandlers[User] {
+// AddStaticMenu adds a static state Handler
+func (e *EngineWithPrivateStateHandlers) AddStaticMenu(
+	state string, handler *StaticMenu) *EngineWithPrivateStateHandlers {
 
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -58,8 +58,8 @@ func (e *EngineWithPrivateStateHandlers[User]) AddStaticMenu(
 	return e
 }
 
-func (e *EngineWithPrivateStateHandlers[User]) AddMiddleware(
-	middleware func(*tgbotapi.TelegramBot, *StateUpdate[User]) (string, bool)) *EngineWithPrivateStateHandlers[User] {
+func (e *EngineWithPrivateStateHandlers) AddMiddleware(
+	middleware UpdateHandler) *EngineWithPrivateStateHandlers {
 
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -69,9 +69,9 @@ func (e *EngineWithPrivateStateHandlers[User]) AddMiddleware(
 	return e
 }
 
-// AddInlineMenu adds an inline state handler
-func (e *EngineWithPrivateStateHandlers[User]) AddInlineMenu(
-	name string, handler *InlineMenu[User]) *EngineWithPrivateStateHandlers[User] {
+// AddInlineMenu adds an inline state Handler
+func (e *EngineWithPrivateStateHandlers) AddInlineMenu(
+	name string, handler *InlineMenu) *EngineWithPrivateStateHandlers {
 
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -84,8 +84,8 @@ func (e *EngineWithPrivateStateHandlers[User]) AddInlineMenu(
 }
 
 // WithLanguageConfig adds a language config to the engine
-func (e *EngineWithPrivateStateHandlers[User]) WithLanguageConfig(
-	cfg *LanguageConfig) *EngineWithPrivateStateHandlers[User] {
+func (e *EngineWithPrivateStateHandlers) WithLanguageConfig(
+	cfg *LanguageConfig) *EngineWithPrivateStateHandlers {
 
 	e.languageConfig = cfg
 
@@ -104,8 +104,8 @@ func (e *EngineWithPrivateStateHandlers[User]) WithLanguageConfig(
 		text += fmt.Sprintf("%s\n", txt)
 	}
 
-	deferredStaticActionBuilder := func(update *StateUpdate[User]) *ActionBuilder {
-		actions := NewActionBuilder()
+	deferredActionBuilder := NewDeferredActionBuilder(func(update *StateUpdate) *ActionBuilder {
+		actions := NewStaticActionHandler()
 
 		for i := range cfg.languages.localizers {
 			lang := cfg.languages.localizers[i]
@@ -119,10 +119,10 @@ func (e *EngineWithPrivateStateHandlers[User]) WithLanguageConfig(
 		}
 
 		return actions
-	}
+	})
 
-	deferredDynamicTextBuilder := NewDynamicTextHandler(func(
-		client *tgbotapi.TelegramBot, update *StateUpdate[User]) (SwitchAction, bool) {
+	deferredDynamicTextBuilder := NewDynamicHandlerText(func(
+		client *tgbotapi.TelegramBot, update *StateUpdate) (SwitchAction, bool) {
 
 		for i := range cfg.languages.localizers {
 			lang := cfg.languages.localizers[i]
@@ -148,23 +148,24 @@ func (e *EngineWithPrivateStateHandlers[User]) WithLanguageConfig(
 		return nil, true
 	})
 
-	menu := NewStaticMenuWithTextAndDeferredActionBuilderAndDynamicHandlers(
-		text, deferredStaticActionBuilder, NewDynamicHandlers(deferredDynamicTextBuilder))
+	menu := NewStaticMenu(
+		NewStaticText(text),
+		deferredActionBuilder,
+		deferredDynamicTextBuilder)
 
 	return e.AddStaticMenu(cfg.changeLanguageState, menu)
 }
 
-func (e *EngineWithPrivateStateHandlers[User]) Process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
-	user, userState, err := e.processUserState(update)
+func (e *EngineWithPrivateStateHandlers) Process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
+	userState, err := e.processUserState(update)
 	if err != nil {
 		e.onErr(client, update, err)
 		return
 	}
 
-	su := &StateUpdate[User]{
+	su := &StateUpdate{
 		storage:    &sync.Map{},
 		State:      userState,
-		User:       user,
 		Update:     update,
 		IsSwitched: false,
 	}
@@ -211,12 +212,13 @@ func (e *EngineWithPrivateStateHandlers[User]) Process(client *tgbotapi.Telegram
 	su.language = lang
 
 	for _, f := range e.middlewares {
-		if target, ok := f(client, su); !ok {
-			if target != "" {
-				if err := e.switchState(from.Id, target, client, su); err != nil {
-					e.onErr(client, update, err)
-				}
-			}
+		switchAction, pass := f.Handle(client, su)
+		if err := e.processSwitchAction(switchAction, su, client); err != nil {
+			e.onErr(client, update, err)
+			return
+		}
+
+		if !pass {
 			return
 		}
 	}
@@ -234,11 +236,11 @@ func (e *EngineWithPrivateStateHandlers[User]) Process(client *tgbotapi.Telegram
 	}
 }
 
-// AddCallbackQueryHandler adds a callback query handler
-func (e *EngineWithPrivateStateHandlers[User]) AddCallbackQueryHandler(
+// AddCallbackQueryHandler adds a callback query Handler
+func (e *EngineWithPrivateStateHandlers) AddCallbackQueryHandler(
 	data string,
-	fn func(*tgbotapi.TelegramBot, *StateUpdate[User], ...string) (SwitchAction, error),
-) *EngineWithPrivateStateHandlers[User] {
+	fn func(*tgbotapi.TelegramBot, *StateUpdate, ...string) (SwitchAction, error),
+) *EngineWithPrivateStateHandlers {
 
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -248,38 +250,37 @@ func (e *EngineWithPrivateStateHandlers[User]) AddCallbackQueryHandler(
 	return e
 }
 
-func (e *EngineWithPrivateStateHandlers[User]) SwitchState(
-	userID int64, client *tgbotapi.TelegramBot, update *StateUpdate[User], state string) error {
+func (e *EngineWithPrivateStateHandlers) SwitchState(
+	userID int64, client *tgbotapi.TelegramBot, update *StateUpdate, state string) error {
 
 	return e.switchState(userID, state, client, update)
 }
 
-func (e *EngineWithPrivateStateHandlers[User]) SwitchUserState(
+func (e *EngineWithPrivateStateHandlers) SwitchUserState(
 	client *tgbotapi.TelegramBot, userID int64, state string) error {
 
-	user, lang, err := e.userInfo(userID)
+	lang, err := e.userLanguage(userID)
 	if err != nil {
 		return err
 	}
 
-	return e.switchState(userID, state, client, &StateUpdate[User]{
+	return e.switchState(userID, state, client, &StateUpdate{
 		storage:    &sync.Map{},
 		State:      state,
-		User:       user,
 		language:   lang,
 		IsSwitched: true,
 	})
 }
 
-func (e *EngineWithPrivateStateHandlers[User]) SendInlineMenu(
-	client *tgbotapi.TelegramBot, update *StateUpdate[User], menu string, shouldEdit bool) error {
+func (e *EngineWithPrivateStateHandlers) SendInlineMenu(
+	client *tgbotapi.TelegramBot, update *StateUpdate, menu string, shouldEdit bool) error {
 
 	return e.processInlineHandler(menu, client, update, shouldEdit)
 }
 
-// getCallbackQueryHandler returns a callback query handler by data
-func (e *EngineWithPrivateStateHandlers[User]) getCallbackQueryHandler(
-	data string) func(*tgbotapi.TelegramBot, *StateUpdate[User], ...string) (SwitchAction, error) {
+// getCallbackQueryHandler returns a callback query Handler by data
+func (e *EngineWithPrivateStateHandlers) getCallbackQueryHandler(
+	data string) func(*tgbotapi.TelegramBot, *StateUpdate, ...string) (SwitchAction, error) {
 
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -291,7 +292,7 @@ func (e *EngineWithPrivateStateHandlers[User]) getCallbackQueryHandler(
 	return nil
 }
 
-func (e *EngineWithPrivateStateHandlers[User]) canProcess(update tgbotapi.Update) bool {
+func (e *EngineWithPrivateStateHandlers) canProcess(update tgbotapi.Update) bool {
 	if chat := update.Chat(); chat != nil && chat.Type == "private" {
 		return true
 	}
@@ -299,8 +300,8 @@ func (e *EngineWithPrivateStateHandlers[User]) canProcess(update tgbotapi.Update
 	return false
 }
 
-func (e *EngineWithPrivateStateHandlers[User]) processCallbackQuery(
-	client *tgbotapi.TelegramBot, update *StateUpdate[User]) {
+func (e *EngineWithPrivateStateHandlers) processCallbackQuery(
+	client *tgbotapi.TelegramBot, update *StateUpdate) {
 
 	if update.Update.CallbackQuery.Data == "" {
 		return
@@ -322,7 +323,7 @@ func (e *EngineWithPrivateStateHandlers[User]) processCallbackQuery(
 				e.onErr(client, update.Update, err)
 			}
 		} else {
-			e.onErr(client, update.Update, errors.New("callback query handler not found: "+data[0]))
+			e.onErr(client, update.Update, errors.New("callback query Handler not found: "+data[0]))
 		}
 		return
 	} else {
@@ -334,15 +335,15 @@ func (e *EngineWithPrivateStateHandlers[User]) processCallbackQuery(
 	}
 }
 
-func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
-	userID int64, handler *StaticMenu[User], client *tgbotapi.TelegramBot, update *StateUpdate[User]) {
+func (e *EngineWithPrivateStateHandlers) processStaticHandler(
+	userID int64, handler *StaticMenu, client *tgbotapi.TelegramBot, update *StateUpdate) {
 
 	for _, middleware := range handler.middlewares {
-		if middleware == nil {
+		if middleware.UpdateHandler == nil {
 			continue
 		}
 
-		if switchAction, ok := middleware(client, update); !ok {
+		if switchAction, ok := middleware.Handle(client, update); !ok {
 			if err := e.processSwitchAction(switchAction, update, client); err != nil {
 				e.onErr(client, update.Update, err)
 			}
@@ -392,7 +393,7 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 					case ActionKindRaw:
 						shouldStop = false
 						// do nothing for raw action, as it is only used to act like a button and may be handled in a
-						// dynamic handler
+						// dynamic Handler
 						break
 					default:
 						err = fmt.Errorf("unknown_action_kind: %s", buttonAction.Kind())
@@ -409,8 +410,8 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 				}
 			}
 
-			if handler.dynamicHandlers != nil {
-				switchAction, next := handler.dynamicHandlers.Process(client, update)
+			if handler.dynamicHandlers != nil && handler.dynamicHandlers[TextHandler] != nil {
+				switchAction, next := handler.dynamicHandlers[TextHandler].Handle(client, update)
 				if err := e.processSwitchAction(switchAction, update, client); err != nil {
 					e.onErr(client, update.Update, err)
 					return
@@ -442,8 +443,8 @@ func (e *EngineWithPrivateStateHandlers[User]) processStaticHandler(
 	}
 }
 
-func (e *EngineWithPrivateStateHandlers[User]) processInlineHandler(
-	menuName string, client *tgbotapi.TelegramBot, update *StateUpdate[User], edit bool) error {
+func (e *EngineWithPrivateStateHandlers) processInlineHandler(
+	menuName string, client *tgbotapi.TelegramBot, update *StateUpdate, edit bool) error {
 
 	menu, ok := e.inlineMenus[menuName]
 	if !ok {
@@ -502,8 +503,8 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineHandler(
 	return nil
 }
 
-func (e *EngineWithPrivateStateHandlers[User]) switchState(
-	userID int64, nextState string, client *tgbotapi.TelegramBot, stateUpdate *StateUpdate[User]) error {
+func (e *EngineWithPrivateStateHandlers) switchState(
+	userID int64, nextState string, client *tgbotapi.TelegramBot, stateUpdate *StateUpdate) error {
 
 	if handler := e.staticMenus[nextState]; handler != nil {
 		if err := e.userRepository.SetState(userID, nextState); err != nil {
@@ -521,23 +522,20 @@ func (e *EngineWithPrivateStateHandlers[User]) switchState(
 	return fmt.Errorf("no_handler_for_state: %s", nextState)
 }
 
-func (e *EngineWithPrivateStateHandlers[User]) processUserState(update tgbotapi.Update) (User, string, error) {
+func (e *EngineWithPrivateStateHandlers) processUserState(update tgbotapi.Update) (string, error) {
 	from := update.From()
 
 	if from == nil {
-		return *new(User), "", errors.New("empty_from")
+		return "", errors.New("empty_from")
 	}
 
-	user, err := e.userRepository.Find(from.Id)
+	err := e.userRepository.Upsert(from)
 	if err != nil {
-		user, err = e.userRepository.Store(from)
-		if err != nil {
-			return *new(User), "", fmt.Errorf("store_user: %w", err)
-		}
+
 	}
 
 	if e.defaultStateName == "" {
-		return *new(User), "", fmt.Errorf("empty_default_state_name")
+		return "", fmt.Errorf("empty_default_state_name")
 	}
 
 	userState, err := e.userRepository.GetState(from.Id)
@@ -545,19 +543,14 @@ func (e *EngineWithPrivateStateHandlers[User]) processUserState(update tgbotapi.
 		userState = e.defaultStateName
 		err = e.userRepository.SetState(from.Id, userState)
 		if err != nil {
-			return *new(User), "", fmt.Errorf("store_user_state: %w", err)
+			return "", fmt.Errorf("store_user_state: %w", err)
 		}
 	}
 
-	return user, userState, nil
+	return userState, nil
 }
 
-func (e *EngineWithPrivateStateHandlers[User]) userInfo(userID int64) (User, *Language, error) {
-	user, err := e.userRepository.Find(userID)
-	if err != nil {
-		return *new(User), nil, fmt.Errorf("find_user: %w", err)
-	}
-
+func (e *EngineWithPrivateStateHandlers) userLanguage(userID int64) (*Language, error) {
 	var lang *Language
 
 	if e.languageConfig != nil {
@@ -567,13 +560,13 @@ func (e *EngineWithPrivateStateHandlers[User]) userInfo(userID int64) (User, *La
 		}
 	}
 
-	return user, lang, nil
+	return lang, nil
 
 }
 
 // getHandlerByAction returns inline menu by action
-func (e *EngineWithPrivateStateHandlers[User]) getHandlerByAction(
-	client *tgbotapi.TelegramBot, update *StateUpdate[User], action string) (InlineAction, error) {
+func (e *EngineWithPrivateStateHandlers) getHandlerByAction(
+	client *tgbotapi.TelegramBot, update *StateUpdate, action string) (InlineAction, error) {
 
 	for _, menu := range e.inlineMenus {
 		for _, f := range menu.middlewares {
@@ -605,8 +598,8 @@ func (e *EngineWithPrivateStateHandlers[User]) getHandlerByAction(
 }
 
 // getHandlerByAction returns inline menu by action
-func (e *EngineWithPrivateStateHandlers[User]) processInlineCallbackHandler(
-	client *tgbotapi.TelegramBot, update *StateUpdate[User], menu *InlineMenu[User], data []string) error {
+func (e *EngineWithPrivateStateHandlers) processInlineCallbackHandler(
+	client *tgbotapi.TelegramBot, update *StateUpdate, menu *InlineMenu, data []string) error {
 
 	for _, f := range menu.getMiddlewares() {
 		if !f(client, update) {
@@ -657,15 +650,15 @@ func (e *EngineWithPrivateStateHandlers[User]) processInlineCallbackHandler(
 				return e.processSwitchAction(switchAction, update, client)
 			}
 
-			return errors.New("callback query handler not found")
+			return errors.New("callback query Handler not found")
 		}
 	}
 
 	return errors.New("processor_for_action_not_found")
 }
 
-func (e *EngineWithPrivateStateHandlers[User]) processSwitchAction(
-	action SwitchAction, update *StateUpdate[User], client *tgbotapi.TelegramBot) error {
+func (e *EngineWithPrivateStateHandlers) processSwitchAction(
+	action SwitchAction, update *StateUpdate, client *tgbotapi.TelegramBot) error {
 
 	if action == nil {
 		return nil

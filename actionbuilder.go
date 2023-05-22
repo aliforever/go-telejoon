@@ -171,6 +171,25 @@ type Action interface {
 	Result() string
 }
 
+type ActionBuilderKind interface {
+	Build(update *StateUpdate) *ActionBuilder
+}
+
+type DeferredActionBuilder func(update *StateUpdate) *ActionBuilder
+
+// Build builds the deferred action builder.
+func (d DeferredActionBuilder) Build(update *StateUpdate) *ActionBuilder {
+	return d(update)
+}
+
+// NewDeferredActionBuilder creates a new DeferredActionBuilder.
+func NewDeferredActionBuilder(
+	builder func(update *StateUpdate) *ActionBuilder,
+) DeferredActionBuilder {
+
+	return builder
+}
+
 type ActionBuilder struct {
 	locker sync.Mutex
 
@@ -183,8 +202,8 @@ type ActionBuilder struct {
 	maxButtonPerRow int
 }
 
-// NewActionBuilder creates a new ActionBuilder.
-func NewActionBuilder() *ActionBuilder {
+// NewStaticActionHandler creates a new ActionBuilder.
+func NewStaticActionHandler() *ActionBuilder {
 	return &ActionBuilder{
 		buttonOptions: make(map[string][]*ButtonOptions),
 	}
@@ -453,6 +472,10 @@ func (b *ActionBuilder) AddCustomCommand(action Action) *ActionBuilder {
 
 	b.commands = append(b.commands, action)
 
+	return b
+}
+
+func (b *ActionBuilder) Build(_ *StateUpdate) *ActionBuilder {
 	return b
 }
 

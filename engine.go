@@ -7,12 +7,12 @@ import (
 	"log"
 )
 
-type engine[User any, Channel any, Group any, Language any] struct {
+type engine struct {
 	opts []*Options
 }
 
 // sendConfigWithErrHandler is a helper function to send a message with a config and handle errors.
-func (t *engine[User, Channel, Group, Language]) sendConfigWithErrHandler(
+func (t *engine) sendConfigWithErrHandler(
 	client *tgbotapi.TelegramBot, config tgbotapi.Config, update tgbotapi.Update) (*tgbotapi.Response, error) {
 
 	if len(t.opts) > 0 {
@@ -31,7 +31,7 @@ func (t *engine[User, Channel, Group, Language]) sendConfigWithErrHandler(
 	return nil, err
 }
 
-func (t *engine[User, Channel, Group, Language]) onErr(
+func (t *engine) onErr(
 	client *tgbotapi.TelegramBot, update tgbotapi.Update, err error) {
 
 	if len(t.opts) > 0 {
