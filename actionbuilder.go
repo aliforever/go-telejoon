@@ -17,158 +17,85 @@ const (
 	ActionKindRaw        ActionKind = "RAW"
 )
 
+type Action interface {
+	Name(update *StateUpdate) string
+}
+
 type baseCommand struct {
-	command string
+	command TextBuilder
+}
+
+func (b baseCommand) Name(update *StateUpdate) string {
+	return b.command.String(update)
 }
 
 // textCommand is a command that sends a text message.
 type textCommand struct {
 	baseCommand
+
 	text string
 }
-
-func (t textCommand) Name() string {
-	return t.command
-}
-
-func (t textCommand) Kind() ActionKind {
-	return ActionKindText
-}
-
-func (t textCommand) Result() string {
-	return t.text
-}
-
-// --------------------------------------------
 
 // inlineMenuCommand is a command that is used to switch to an inline menu.
 type inlineMenuCommand struct {
 	baseCommand
+
 	inlineMenu string
 }
-
-func (t inlineMenuCommand) Name() string {
-	return t.command
-}
-
-func (t inlineMenuCommand) Kind() ActionKind {
-	return ActionKindInlineMenu
-}
-
-func (t inlineMenuCommand) Result() string {
-	return t.inlineMenu
-}
-
-// --------------------------------------------
 
 // stateCommand is a command that is used to switch to a state.
 type stateCommand struct {
 	baseCommand
+
 	state string
 }
 
-func (t stateCommand) Name() string {
-	return t.command
+type baseButtonOptions interface {
+	Options() *ButtonOptions
 }
-
-func (t stateCommand) Kind() ActionKind {
-	return ActionKindState
-}
-
-func (t stateCommand) Result() string {
-	return t.state
-}
-
-// --------------------------------------------
 
 type baseButton struct {
-	button  string
+	button TextBuilder
+
 	options []*ButtonOptions
 }
 
-// textButton is a action that sends a text message.
+func (t baseButton) Name(update *StateUpdate) string {
+	return t.button.String(update)
+}
+
+func (t baseButton) Options() *ButtonOptions {
+	if len(t.options) == 0 {
+		return nil
+	}
+
+	return t.options[0]
+}
+
+// textButton is a button that sends a text message when clicked.
 type textButton struct {
 	baseButton
-	text string
+
+	text TextBuilder
 }
 
-func (t textButton) Name() string {
-	return t.button
-}
-
-func (t textButton) Kind() ActionKind {
-	return ActionKindText
-}
-
-func (t textButton) Result() string {
-	return t.text
-}
-
-// --------------------------------------------
-
-// inlineMenuButton is a action that is used to switch to an inline menu.
+// inlineMenuButton is a button that switches to an inline menu when clicked.
 type inlineMenuButton struct {
 	baseButton
+
 	inlineMenu string
 }
 
-func (t inlineMenuButton) Name() string {
-	return t.button
-}
-
-func (t inlineMenuButton) Kind() ActionKind {
-	return ActionKindInlineMenu
-}
-
-func (t inlineMenuButton) Result() string {
-	return t.inlineMenu
-}
-
-// --------------------------------------------
-
-// stateButton is a action that is used to switch to a state.
+// stateButton is a button that switches to a state when clicked.
 type stateButton struct {
 	baseButton
+
 	state string
 }
-
-func (t stateButton) Name() string {
-	return t.button
-}
-
-func (t stateButton) Kind() ActionKind {
-	return ActionKindState
-}
-
-func (t stateButton) Result() string {
-	return t.state
-}
-
-// --------------------------------------------
 
 // rawButton is only a raw button that does nothing but sends the button name.
 type rawButton struct {
 	baseButton
-}
-
-func (t rawButton) Name() string {
-	return t.button
-}
-
-func (t rawButton) Kind() ActionKind {
-	return ActionKindRaw
-}
-
-func (t rawButton) Result() string {
-	return ""
-}
-
-// --------------------------------------------
-
-type Action interface {
-	Name() string
-	Kind() ActionKind
-	Result() string
 }
 
 type ActionBuilderKind interface {
@@ -196,17 +123,13 @@ type ActionBuilder struct {
 	buttons  []Action
 	commands []Action
 
-	buttonOptions map[string][]*ButtonOptions
-
 	buttonFormation []int
 	maxButtonPerRow int
 }
 
 // NewStaticActionBuilder creates a new ActionBuilder.
 func NewStaticActionBuilder() *ActionBuilder {
-	return &ActionBuilder{
-		buttonOptions: make(map[string][]*ButtonOptions),
-	}
+	return &ActionBuilder{}
 }
 
 // SetMaxButtonPerRow sets the maximum number of buttons per row.
@@ -229,7 +152,7 @@ func (b *ActionBuilder) SetButtonFormation(formation ...int) *ActionBuilder {
 }
 
 // AddTextButton adds a textHandler action to the ActionBuilder.
-func (b *ActionBuilder) AddTextButton(button, text string, opts ...*ButtonOptions) *ActionBuilder {
+func (b *ActionBuilder) AddTextButton(button TextBuilder, text TextBuilder, opts ...*ButtonOptions) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -240,41 +163,13 @@ func (b *ActionBuilder) AddTextButton(button, text string, opts ...*ButtonOption
 		},
 		text: text,
 	})
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = opts
-	}
-
-	return b
-}
-
-// AddTextButtonT adds a textHandler action to the ActionBuilder with name translation.
-func (b *ActionBuilder) AddTextButtonT(button, text string, opts ...*ButtonOptions) *ActionBuilder {
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.buttons = append(b.buttons, textButton{
-		baseButton: baseButton{
-			button:  button,
-			options: opts,
-		},
-		text: text,
-	})
-
-	b.buttonOptions[button] = []*ButtonOptions{
-		NewButtonOptions().TranslateName(),
-	}
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
-	}
 
 	return b
 }
 
 // AddInlineMenuButton adds an inline menu action to the ActionBuilder.
 func (b *ActionBuilder) AddInlineMenuButton(
-	button, inlineMenu string, opts ...*ButtonOptions) *ActionBuilder {
+	button TextBuilder, inlineMenu string, opts ...*ButtonOptions) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -285,39 +180,12 @@ func (b *ActionBuilder) AddInlineMenuButton(
 		},
 		inlineMenu: inlineMenu,
 	})
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = opts
-	}
-
-	return b
-}
-
-// AddInlineMenuButtonT adds an inline menu action to the ActionBuilder with name translation.
-func (b *ActionBuilder) AddInlineMenuButtonT(button, inlineMenu string, opts ...*ButtonOptions) *ActionBuilder {
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.buttons = append(b.buttons, inlineMenuButton{
-		baseButton: baseButton{
-			button: button,
-		},
-		inlineMenu: inlineMenu,
-	})
-
-	b.buttonOptions[button] = []*ButtonOptions{
-		NewButtonOptions().TranslateName(),
-	}
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
-	}
 
 	return b
 }
 
 // AddStateButton adds a state action to the ActionBuilder.
-func (b *ActionBuilder) AddStateButton(button, state string, opts ...*ButtonOptions) *ActionBuilder {
+func (b *ActionBuilder) AddStateButton(button TextBuilder, state string, opts ...*ButtonOptions) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -327,42 +195,12 @@ func (b *ActionBuilder) AddStateButton(button, state string, opts ...*ButtonOpti
 			options: opts,
 		}, state: state,
 	})
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = opts
-	}
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
-	}
-
-	return b
-}
-
-// AddStateButtonT adds a state action to the ActionBuilder with name translation.
-func (b *ActionBuilder) AddStateButtonT(button, state string, opts ...*ButtonOptions) *ActionBuilder {
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.buttons = append(b.buttons, stateButton{
-		baseButton: baseButton{
-			button: button,
-		}, state: state,
-	})
-
-	b.buttonOptions[button] = []*ButtonOptions{
-		NewButtonOptions().TranslateName(),
-	}
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
-	}
 
 	return b
 }
 
 // AddRawButton adds a raw button to the ActionBuilder.
-func (b *ActionBuilder) AddRawButton(button string, opts ...*ButtonOptions) *ActionBuilder {
+func (b *ActionBuilder) AddRawButton(button TextBuilder, opts ...*ButtonOptions) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -373,41 +211,11 @@ func (b *ActionBuilder) AddRawButton(button string, opts ...*ButtonOptions) *Act
 		},
 	})
 
-	if len(opts) > 0 {
-		b.buttonOptions[button] = opts
-	}
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
-	}
-
-	return b
-}
-
-// AddRawButtonT adds a raw button to the ActionBuilder with name translation.
-func (b *ActionBuilder) AddRawButtonT(button string, opts ...*ButtonOptions) *ActionBuilder {
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.buttons = append(b.buttons, rawButton{
-		baseButton: baseButton{
-			button: button,
-		},
-	})
-
-	b.buttonOptions[button] = []*ButtonOptions{
-		NewButtonOptions().TranslateName(),
-	}
-
-	if len(opts) > 0 {
-		b.buttonOptions[button] = append(b.buttonOptions[button], opts...)
-	}
-
 	return b
 }
 
 // AddTextCommand adds a textHandler command to the ActionBuilder.
-func (b *ActionBuilder) AddTextCommand(command, text string) *ActionBuilder {
+func (b *ActionBuilder) AddTextCommand(command TextBuilder, text string) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -422,7 +230,7 @@ func (b *ActionBuilder) AddTextCommand(command, text string) *ActionBuilder {
 }
 
 // AddInlineMenuCommand adds an inline menu command to the ActionBuilder.
-func (b *ActionBuilder) AddInlineMenuCommand(command, inlineMenu string) *ActionBuilder {
+func (b *ActionBuilder) AddInlineMenuCommand(command TextBuilder, inlineMenu string) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -437,7 +245,7 @@ func (b *ActionBuilder) AddInlineMenuCommand(command, inlineMenu string) *Action
 }
 
 // AddStateCommand adds a state command to the ActionBuilder.
-func (b *ActionBuilder) AddStateCommand(command, state string) *ActionBuilder {
+func (b *ActionBuilder) AddStateCommand(command TextBuilder, state string) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -452,15 +260,11 @@ func (b *ActionBuilder) AddStateCommand(command, state string) *ActionBuilder {
 }
 
 // AddCustomButton adds a custom action of button type to the ActionBuilder.
-func (b *ActionBuilder) AddCustomButton(action Action, opts ...*ButtonOptions) *ActionBuilder {
+func (b *ActionBuilder) AddCustomButton(action Action) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
 	b.buttons = append(b.buttons, action)
-
-	if len(opts) > 0 {
-		b.buttonOptions[action.Name()] = append(b.buttonOptions[action.Name()], opts...)
-	}
 
 	return b
 }
@@ -480,9 +284,9 @@ func (b *ActionBuilder) Build(_ *StateUpdate) *ActionBuilder {
 }
 
 // getButtonByButton returns the action by the button.
-func (b *ActionBuilder) getButtonByButton(button string) Action {
+func (b *ActionBuilder) getButtonByButton(update *StateUpdate, button string) Action {
 	for _, btn := range b.buttons {
-		if btn.Name() == button {
+		if btn.Name(update) == button {
 			return btn
 		}
 	}
@@ -491,7 +295,7 @@ func (b *ActionBuilder) getButtonByButton(button string) Action {
 }
 
 // buildButtons builds the buttons.
-func (b *ActionBuilder) buildButtons(language *Language) *structs.ReplyKeyboardMarkup {
+func (b *ActionBuilder) buildButtons(update *StateUpdate) *structs.ReplyKeyboardMarkup {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -502,26 +306,19 @@ func (b *ActionBuilder) buildButtons(language *Language) *structs.ReplyKeyboardM
 	newButtons := []string{}
 
 	for _, button := range b.buttons {
-		name := button.Name()
+		name := button.Name(update)
 
 		shouldBreakAfter := false
 
-		if opts := b.buttonOptions[button.Name()]; len(opts) > 0 {
-			if language != nil {
-				if opts[0].translateName {
-					btnText, err := language.Get(button.Name())
-					if err == nil {
-						name = btnText
-					}
+		if opts, ok := button.(baseButtonOptions); ok {
+			if btnOpts := opts.Options(); btnOpts != nil {
+				if btnOpts.breakBefore {
+					newButtons = append(newButtons, "")
 				}
-			}
 
-			if opts[0].breakBefore {
-				newButtons = append(newButtons, "")
-			}
-
-			if opts[0].breakAfter {
-				shouldBreakAfter = true
+				if btnOpts.breakAfter {
+					shouldBreakAfter = true
+				}
 			}
 		}
 
@@ -534,24 +331,4 @@ func (b *ActionBuilder) buildButtons(language *Language) *structs.ReplyKeyboardM
 
 	return tools.Keyboards{}.NewReplyKeyboardFromSliceOfStringsWithFormation(
 		newButtons, b.maxButtonPerRow, b.buttonFormation)
-}
-
-func (b *ActionBuilder) languageValueButtonKeys(language *Language) map[string]string {
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	var valueKeys = make(map[string]string)
-
-	for k, v := range b.buttonOptions {
-		if len(v) > 0 && v[0].translateName {
-			keyValue, err := language.Get(k)
-			if err != nil {
-				valueKeys[k] = k
-			} else {
-				valueKeys[keyValue] = k
-			}
-		}
-	}
-
-	return valueKeys
 }

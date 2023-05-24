@@ -115,7 +115,7 @@ func (e *EngineWithPrivateStateHandlers) WithLanguageConfig(
 				btnText = lang.tag
 			}
 
-			actions.AddRawButton(btnText)
+			actions.AddRawButton(NewStaticText(btnText))
 		}
 
 		return actions
@@ -360,45 +360,34 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 		if !update.IsSwitched {
 			buttonText := update.Update.Message.Text
 
-			if update.language != nil && actionBuilder != nil {
-				if languageValueKeys := actionBuilder.languageValueButtonKeys(update.language); languageValueKeys != nil {
-					if languageValueKey := languageValueKeys[buttonText]; languageValueKey != "" {
-						buttonText = languageValueKey
-					}
-				}
-			}
-
 			if actionBuilder != nil {
-				if buttonAction := actionBuilder.getButtonByButton(buttonText); buttonAction != nil {
+				if buttonAction := actionBuilder.getButtonByButton(update, buttonText); buttonAction != nil {
 					var err error
 
 					shouldStop := true
 
-					switch buttonAction.Kind() {
-					case ActionKindText:
-						text := buttonAction.Result()
-						_, err = client.Send(client.Message().SetText(text).SetChatId(userID))
-						if err != nil {
+					switch a := buttonAction.(type) {
+					case textButton:
+						if _, err = client.
+							Send(client.Message().SetText(a.text.String(update)).SetChatId(userID)); err != nil {
 							err = fmt.Errorf("error_sending_message_to_user: %d, %w", userID, err)
 						}
-					case ActionKindState:
-						nextState := buttonAction.Result()
-						if err := e.switchState(userID, nextState, client, update); err != nil {
+					case stateButton:
+						if err := e.switchState(userID, a.state, client, update); err != nil {
 							err = fmt.Errorf("error_switching_state: %d, %w", userID, err)
 						}
-					case ActionKindInlineMenu:
-						inlineMenu := buttonAction.Result()
-						err = e.processInlineHandler(inlineMenu, client, update, false)
+					case inlineMenuButton:
+						err = e.processInlineHandler(a.inlineMenu, client, update, false)
 						if err != nil {
 							err = fmt.Errorf("error_switching_inline_menu: %d, %w", userID, err)
 						}
-					case ActionKindRaw:
+					case rawButton:
 						shouldStop = false
 						// do nothing for raw action, as it is only used to act like a button and may be handled in a
 						// dynamic Handler
 						break
 					default:
-						err = fmt.Errorf("unknown_action_kind: %s", buttonAction.Kind())
+						err = fmt.Errorf("unknown_action_kind: %+v", buttonAction)
 					}
 
 					if err != nil {
@@ -429,7 +418,7 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 	var replyMarkup *structs.ReplyKeyboardMarkup
 
 	if actionBuilder != nil {
-		replyMarkup = actionBuilder.buildButtons(update.language)
+		replyMarkup = actionBuilder.buildButtons(update)
 	}
 
 	if replyText := handler.processReplyText(update); replyText != "" {
@@ -457,28 +446,25 @@ func (e *EngineWithPrivateStateHandlers) processInlineHandler(
 
 	if middlewares := menu.getMiddlewares(); len(middlewares) > 0 {
 		for _, middleware := range middlewares {
-			if canProceed := middleware(client, update); !canProceed {
+			switchAction, pass := middleware.Handle(client, update)
+			if err := e.processSwitchAction(switchAction, update, client); err != nil {
+				return err
+			}
+
+			if !pass {
 				return nil
 			}
 		}
 	}
 
-	menuActionBuilder := menu.getDeferredActionBuilder(update)
-	if menuActionBuilder == nil {
-		menuActionBuilder = menu.getActionBuilder()
-	}
-
-	if menuActionBuilder == nil {
+	actionBuilder := menu.processActionBuilder(update)
+	if actionBuilder == nil {
 		return fmt.Errorf("inline_menu_action_builder_not_set: %s", menuName)
 	}
 
-	markup := menuActionBuilder.buildButtons(update.language)
+	markup := actionBuilder.buildButtons(update)
 
-	var replyText = menu.replyText
-	if menu.deferredReplyText != nil {
-		replyText = menu.deferredReplyText(update)
-	}
-
+	replyText := menu.processTextBuilder(update)
 	if replyText == "" {
 		return fmt.Errorf("inline_menu_reply_text_not_set: %s", menuName)
 	}
@@ -567,61 +553,28 @@ func (e *EngineWithPrivateStateHandlers) userLanguage(userID int64) (*Language, 
 }
 
 // getHandlerByAction returns inline menu by action
-func (e *EngineWithPrivateStateHandlers) getHandlerByAction(
-	client *tgbotapi.TelegramBot, update *StateUpdate, action string) (InlineAction, error) {
-
-	for _, menu := range e.inlineMenus {
-		for _, f := range menu.middlewares {
-			if !f(client, update) {
-				return nil, nil
-			}
-		}
-
-		menuActionBuilder := menu.getDeferredActionBuilder(update)
-		if menuActionBuilder == nil {
-			menuActionBuilder = menu.getActionBuilder()
-		}
-
-		if menuActionBuilder == nil {
-			continue
-		}
-
-		handlers := menuActionBuilder.getByCallbackActionData()
-		if handlers == nil {
-			continue
-		}
-
-		if handler, ok := handlers[action]; ok {
-			return handler, nil
-		}
-	}
-
-	return nil, fmt.Errorf("handler_for_action_not_found: %s", action)
-}
-
-// getHandlerByAction returns inline menu by action
 func (e *EngineWithPrivateStateHandlers) processInlineCallbackHandler(
 	client *tgbotapi.TelegramBot, update *StateUpdate, menu *InlineMenu, data []string) error {
 
 	for _, f := range menu.getMiddlewares() {
-		if !f(client, update) {
+		switchAction, pass := f.Handle(client, update)
+		if err := e.processSwitchAction(switchAction, update, client); err != nil {
+			return err
+		}
+		if !pass {
 			return nil
 		}
 	}
 
-	menuActionBuilder := menu.getDeferredActionBuilder(update)
+	menuActionBuilder := menu.processActionBuilder(update)
 	if menuActionBuilder == nil {
-		menuActionBuilder = menu.getActionBuilder()
-	}
-
-	if menuActionBuilder == nil && menu.deferredActionBuilder == nil {
 		return fmt.Errorf("inline_menu_action_builder_not_set: %s", menu.callbackPrefix)
 	}
 
 	actionHandlers := menuActionBuilder.getByCallbackActionData()
 
 	if actionHandlers == nil {
-		return fmt.Errorf("inline_menu_action_builder_not_set: %s", menu.callbackPrefix)
+		return fmt.Errorf("inline_menu_action_data_not_found: %s", menu.callbackPrefix)
 	}
 
 	if handler, ok := actionHandlers[data[0]]; !ok {
@@ -643,8 +596,8 @@ func (e *EngineWithPrivateStateHandlers) processInlineCallbackHandler(
 		case inlineInlineMenuButton:
 			return e.processInlineHandler(btn.menu, client, update, btn.edit)
 		case inlineCallbackButton:
-			if callbackHandler := e.getCallbackQueryHandler(data[0]); callbackHandler != nil {
-				switchAction, err := callbackHandler(client, update, data[1:]...)
+			if btn.handler != nil {
+				switchAction, err := btn.handler(client, update, data[1:]...)
 				if err != nil {
 					return err
 				}

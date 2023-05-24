@@ -87,10 +87,10 @@ func TestStart(t *testing.T) {
 							telejoon.NewStaticMenu(
 								telejoon.NewLanguageKeyText("Welcome.Main"),
 								telejoon.NewStaticActionBuilder().
-									AddStateButtonT("Welcome.ChangeLanguageBtn", "ChangeLanguage").
-									AddTextButton("Hello", "You said Hello").
-									AddStateButton("Info State", "Info").
-									AddInlineMenuButton("Info", "Info"),
+									AddStateButton(telejoon.NewLanguageKeyText("Welcome.ChangeLanguageBtn"), "ChangeLanguage").
+									AddTextButton(telejoon.NewStaticText("Hello"), telejoon.NewStaticText("You said Hello")).
+									AddStateButton(telejoon.NewStaticText("Info State"), "Info").
+									AddInlineMenuButton(telejoon.NewStaticText("Info"), "Info"),
 								telejoon.NewDynamicHandlerText(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate) (telejoon.SwitchAction, bool) {
 									if update.Update.Message.Text == "Hello Bro" {
 										client.Send(client.Message().SetChatId(update.Update.From().Id).
@@ -114,26 +114,25 @@ func TestStart(t *testing.T) {
 						AddStaticMenu("Info", telejoon.NewStaticMenu(
 							telejoon.NewLanguageKeyText("Info.Hello"),
 							telejoon.NewStaticActionBuilder().
-								AddStateButtonT("Global.Back", "Welcome"))).
+								AddStateButton(telejoon.NewLanguageKeyText("Global.Back"), "Welcome"))).
 						AddInlineMenu("Info", telejoon.
-							NewInlineMenuWithTextAndActionBuilder("Info Inline Menu",
+							NewInlineMenu(telejoon.NewStaticText("Info Inline Menu"),
 								telejoon.NewInlineActionBuilder().
-									AddUrlButton("Google", "https://google.com").
-									AddAlertButtonT("Info.Hello", "say_hello_0", "HI!").
-									AddAlertButton("Hello", "say_hello", "Hello Friend").
-									AddAlertButton("Hello 2", "say_hello_2", "Hello Friend 2").
-									AddAlertButton("Hello 3", "say_hello_3", "Hello Friend 3").
-									AddCallbackButton("Callback 1", "callback_1:data").
-									AddCallbackButton("Callback 2", "callback_1:data2").
-									AddInlineMenuButtonWithEdit("Change Menu to Info 2", "Info2", "Info2").
+									AddUrlButton(telejoon.NewStaticText("Google"), "https://google.com").
+									AddAlertButton(telejoon.NewLanguageKeyText("Info.Hello"), "say_hello_0", "HI!").
+									AddAlertButton(telejoon.NewStaticText("Hello"), "say_hello", "Hello Friend").
+									AddAlertButton(telejoon.NewStaticText("Hello 2"), "say_hello_2", "Hello Friend 2").
+									AddAlertButton(telejoon.NewStaticText("Hello 3"), "say_hello_3", "Hello Friend 3").
+									AddCallbackButton(telejoon.NewStaticText("Callback 1"), "callback_1:data", callbackHandler).
+									AddCallbackButton(telejoon.NewStaticText("Callback 2"), "callback_1:data2", callbackHandler).
+									AddInlineMenuButtonWithEdit(telejoon.NewStaticText("Change Menu to Info 2"), "Info2", "Info2").
 									SetMaxButtonPerRow(3))).
 						AddInlineMenu("Info2", telejoon.
-							NewInlineMenuWithTextAndActionBuilder(
-								"Info2 Inline Menu", telejoon.NewInlineActionBuilder().
-									AddAlertButtonWithDialog("Hello", "say_hello_4", "Hello Friend").
-									AddInlineMenuButtonWithEdit("CustomInline", "CustomInline", "CustomInline").
-									AddInlineMenuButtonWithEdit("Back", "Info", "Info"))).
-						AddCallbackQueryHandler("callback_1", callbackHandler).
+							NewInlineMenu(
+								telejoon.NewStaticText("Info2 Inline Menu"), telejoon.NewInlineActionBuilder().
+									AddAlertButtonWithDialog(telejoon.NewStaticText("Hello"), "say_hello_4", "Hello Friend").
+									AddInlineMenuButtonWithEdit(telejoon.NewStaticText("CustomInline"), "CustomInline", "CustomInline").
+									AddInlineMenuButtonWithEdit(telejoon.NewStaticText("Back"), "Info", "Info"))).
 						AddInlineMenu("CustomInline", CustomInlineMenu())
 				},
 			},
@@ -170,9 +169,10 @@ func callbackHandler(
 func CustomInlineMenu() *telejoon.InlineMenu {
 	deferredBuilder := func(update *telejoon.StateUpdate) *telejoon.InlineActionBuilder {
 		return telejoon.NewInlineActionBuilder().
-			AddAlertButtonWithDialog("Hello", "say_hello_4", "Hello Friend")
+			AddAlertButtonWithDialog(telejoon.NewStaticText("Hello"), "say_hello_4", "Hello Friend")
 	}
 
 	return telejoon.
-		NewInlineMenuWithTextAndDeferredActionBuilder("Custom Inline Menu", deferredBuilder)
+		NewInlineMenu(telejoon.
+			NewStaticText("Custom Inline Menu"), telejoon.NewDeferredInlineActionBuilder(deferredBuilder))
 }
