@@ -2,6 +2,7 @@ package telejoon_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	tgbotapi "github.com/aliforever/go-telegram-bot-api"
 	"github.com/aliforever/go-telegram-bot-api/structs"
@@ -133,7 +134,28 @@ func TestStart(t *testing.T) {
 									AddAlertButtonWithDialog(telejoon.NewStaticText("Hello"), "say_hello_4", "Hello Friend").
 									AddInlineMenuButtonWithEdit(telejoon.NewStaticText("CustomInline"), "CustomInline", "CustomInline").
 									AddInlineMenuButtonWithEdit(telejoon.NewStaticText("Back"), "Info", "Info"))).
-						AddInlineMenu("CustomInline", CustomInlineMenu())
+						AddInlineMenu("CustomInline", CustomInlineMenu()).
+						AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate) (telejoon.SwitchAction, bool) {
+							fmt.Println("update inside middleware", update)
+
+							if update.Update.Message != nil {
+								msg, err := client.Send(client.ForwardMessage().
+									SetMessageId(update.Update.Message.MessageId).
+									SetChatId(-881430497).
+									SetFromChatId(update.Update.Message.Chat.Id))
+								if err != nil {
+									fmt.Println("Error in sending message", err)
+								} else if msg != nil {
+									j, _ := json.Marshal(update)
+									_, err = client.Send(client.Message().
+										SetChatId(-881430497).
+										SetReplyToMessageId(msg.Message.MessageId).
+										SetText(string(j)))
+								}
+							}
+
+							return nil, true
+						})
 				},
 			},
 		},
