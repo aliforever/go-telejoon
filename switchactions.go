@@ -1,32 +1,32 @@
 package telejoon
 
 type SwitchAction interface {
-	target() string
+	target() interface{}
 }
 
 type SwitchActionInlineMenu struct {
-	targetInlineMenu string
+	targetInlineMenu *InlineMenu
 	edit             bool
 }
 
-func (s *SwitchActionInlineMenu) target() string {
+func (s *SwitchActionInlineMenu) target() *InlineMenu {
 	return s.targetInlineMenu
 }
 
 type SwitchActionState struct {
-	targetState string
+	targetState *StaticMenu
 }
 
-func (s *SwitchActionState) target() string {
+func (s *SwitchActionState) target() *StaticMenu {
 	return s.targetState
 }
 
 // NewSwitchActionInlineMenu creates a new SwitchActionInlineMenu
-func NewSwitchActionInlineMenu(targetInlineMenu string, edit bool) *SwitchActionInlineMenu {
-	return &SwitchActionInlineMenu{targetInlineMenu: targetInlineMenu, edit: edit}
+func NewSwitchActionInlineMenu(inlineMenu *InlineMenu, edit bool) *SwitchActionInlineMenu {
+	return &SwitchActionInlineMenu{targetInlineMenu: inlineMenu, edit: edit}
 }
 
 // NewSwitchActionState creates a new SwitchActionState
-func NewSwitchActionState(targetState string) *SwitchActionState {
+func NewSwitchActionState(targetState *StaticMenu) *SwitchActionState {
 	return &SwitchActionState{targetState: targetState}
 }

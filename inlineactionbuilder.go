@@ -16,7 +16,6 @@ type baseInlineButton struct {
 	options []*ButtonOptions
 }
 
-// Button returns the button
 func (t baseInlineButton) Name(update *StateUpdate) string {
 	return t.button.String(update)
 }
@@ -87,7 +86,11 @@ func NewDeferredInlineActionBuilder(builder func(update *StateUpdate) *InlineAct
 	return DeferredInlineActionBuilder(builder)
 }
 
-type CallbackHandler func(client *tgbotapi.TelegramBot, update *StateUpdate, args ...string) (SwitchAction, error)
+type CallbackHandler func(
+	client *tgbotapi.TelegramBot,
+	update *StateUpdate,
+	args ...string,
+) (SwitchAction, error)
 
 type InlineActionBuilder struct {
 	locker sync.Mutex

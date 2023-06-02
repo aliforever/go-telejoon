@@ -100,5 +100,9 @@ func (s *StaticMenu) processActionBuilder(update *StateUpdate) *ActionBuilder {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
+	if s.actionBuilder == nil {
+		return nil
+	}
+
 	return s.actionBuilder.Build(update)
 }
