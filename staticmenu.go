@@ -25,6 +25,41 @@ type (
 	StaticMenuMiddleware func(*tgbotapi.TelegramBot, *StateUpdate) (SwitchAction, bool)
 )
 
+// NewStaticMenu creates a new StaticMenu with the given text and action builder.
+func NewStaticMenu(
+	text TextBuilder,
+	builder ActionBuilderKind,
+	middlewaresAndDynamicHandlers ...Handler) *StaticMenu {
+
+	middlewares, handlers := parseMiddlewaresAndDynamicHandlers(middlewaresAndDynamicHandlers...)
+
+	return &StaticMenu{
+		textBuilder:     text,
+		actionBuilder:   builder,
+		middlewares:     middlewares,
+		dynamicHandlers: handlers,
+	}
+}
+
+// processReplyText with StateUpdate and returns the text to be replied.
+func (s *StaticMenu) processReplyText(update *StateUpdate) string {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.textBuilder.String(update)
+}
+
+func (s *StaticMenu) processActionBuilder(update *StateUpdate) *ActionBuilder {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if s.actionBuilder == nil {
+		return nil
+	}
+
+	return s.actionBuilder.build(update)
+}
+
 func parseMiddlewaresAndDynamicHandlers(handlers ...Handler) (
 	[]Middleware, map[string]Handler,
 ) {
@@ -70,39 +105,4 @@ func parseMiddlewaresAndDynamicHandlers(handlers ...Handler) (
 	}
 
 	return middlewares, dynamicHandlers
-}
-
-// NewStaticMenu creates a new StaticMenu with the given text and action builder.
-func NewStaticMenu(
-	text TextBuilder,
-	builder ActionBuilderKind,
-	middlewaresAndDynamicHandlers ...Handler) *StaticMenu {
-
-	middlewares, handlers := parseMiddlewaresAndDynamicHandlers(middlewaresAndDynamicHandlers...)
-
-	return &StaticMenu{
-		textBuilder:     text,
-		actionBuilder:   builder,
-		middlewares:     middlewares,
-		dynamicHandlers: handlers,
-	}
-}
-
-// processReplyText with StateUpdate and returns the text to be replied.
-func (s *StaticMenu) processReplyText(update *StateUpdate) string {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.textBuilder.String(update)
-}
-
-func (s *StaticMenu) processActionBuilder(update *StateUpdate) *ActionBuilder {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if s.actionBuilder == nil {
-		return nil
-	}
-
-	return s.actionBuilder.Build(update)
 }

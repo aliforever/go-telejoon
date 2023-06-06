@@ -574,7 +574,7 @@ func (e *EngineWithPrivateStateHandlers) processInlineCallbackHandler(
 		return fmt.Errorf("inline_menu_action_builder_not_set: %s", menu.callbackPrefix)
 	}
 
-	actionHandlers := menuActionBuilder.getByCallbackActionData()
+	actionHandlers := menuActionBuilder.getByCallbackActionData(update)
 	if actionHandlers == nil {
 		return fmt.Errorf("inline_menu_action_data_not_found: %s", menu.callbackPrefix)
 	}

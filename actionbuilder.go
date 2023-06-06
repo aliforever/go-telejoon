@@ -99,13 +99,13 @@ type rawButton struct {
 }
 
 type ActionBuilderKind interface {
-	Build(update *StateUpdate) *ActionBuilder
+	build(update *StateUpdate) *ActionBuilder
 }
 
 type DeferredActionBuilder func(update *StateUpdate) *ActionBuilder
 
 // Build builds the deferred action builder.
-func (d DeferredActionBuilder) Build(update *StateUpdate) *ActionBuilder {
+func (d DeferredActionBuilder) build(update *StateUpdate) *ActionBuilder {
 	return d(update)
 }
 
@@ -279,7 +279,7 @@ func (b *ActionBuilder) AddCustomCommand(action Action) *ActionBuilder {
 	return b
 }
 
-func (b *ActionBuilder) Build(_ *StateUpdate) *ActionBuilder {
+func (b *ActionBuilder) build(_ *StateUpdate) *ActionBuilder {
 	return b
 }
 

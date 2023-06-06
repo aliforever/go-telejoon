@@ -11,7 +11,7 @@ import (
 
 type baseInlineButton struct {
 	button TextBuilder
-	data   string
+	data   TextBuilder
 
 	options []*ButtonOptions
 }
@@ -21,8 +21,8 @@ func (t baseInlineButton) Name(update *StateUpdate) string {
 }
 
 // Data returns the data
-func (t baseInlineButton) Data() string {
-	return t.data
+func (t baseInlineButton) Data(update *StateUpdate) string {
+	return t.data.String(update)
 }
 
 // Options returns the options
@@ -66,7 +66,7 @@ type inlineCallbackButton struct {
 
 type InlineAction interface {
 	Name(update *StateUpdate) string
-	Data() string
+	Data(update *StateUpdate) string
 	Options() *ButtonOptions
 }
 
@@ -129,7 +129,7 @@ func (b *InlineActionBuilder) SetButtonFormation(formation ...int) *InlineAction
 
 // AddUrlButton adds a new url button to the InlineActionBuilder.
 func (b *InlineActionBuilder) AddUrlButton(
-	button TextBuilder, address string, opts ...*ButtonOptions) *InlineActionBuilder {
+	button, address TextBuilder, opts ...*ButtonOptions) *InlineActionBuilder {
 
 	b.locker.Lock()
 	defer b.locker.Unlock()
@@ -146,7 +146,7 @@ func (b *InlineActionBuilder) AddUrlButton(
 }
 
 func (b *InlineActionBuilder) AddInlineMenuButton(
-	button TextBuilder, data, inlineMenu string, opts ...*ButtonOptions) *InlineActionBuilder {
+	button TextBuilder, data TextBuilder, inlineMenu string, opts ...*ButtonOptions) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -163,7 +163,7 @@ func (b *InlineActionBuilder) AddInlineMenuButton(
 }
 
 func (b *InlineActionBuilder) AddInlineMenuButtonWithEdit(
-	button TextBuilder, data, inlineMenu string, opts ...*ButtonOptions) *InlineActionBuilder {
+	button TextBuilder, data TextBuilder, inlineMenu string, opts ...*ButtonOptions) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -181,7 +181,7 @@ func (b *InlineActionBuilder) AddInlineMenuButtonWithEdit(
 }
 
 func (b *InlineActionBuilder) AddAlertButton(
-	button TextBuilder, data, alertText string, opts ...*ButtonOptions) *InlineActionBuilder {
+	button TextBuilder, data TextBuilder, alertText string, opts ...*ButtonOptions) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -198,7 +198,7 @@ func (b *InlineActionBuilder) AddAlertButton(
 }
 
 func (b *InlineActionBuilder) AddAlertButtonWithDialog(
-	button TextBuilder, data, alertText string, opts ...*ButtonOptions) *InlineActionBuilder {
+	button TextBuilder, data TextBuilder, alertText string, opts ...*ButtonOptions) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -221,7 +221,12 @@ func (b *InlineActionBuilder) AddAlertButtonWithDialog(
 	return b
 }
 
-func (b *InlineActionBuilder) AddStateButton(button TextBuilder, data, state string, opts ...*ButtonOptions) *InlineActionBuilder {
+func (b *InlineActionBuilder) AddStateButton(
+	button TextBuilder,
+	data TextBuilder,
+	state string,
+	opts ...*ButtonOptions,
+) *InlineActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -239,7 +244,7 @@ func (b *InlineActionBuilder) AddStateButton(button TextBuilder, data, state str
 
 func (b *InlineActionBuilder) AddCallbackButton(
 	button TextBuilder,
-	data string,
+	data TextBuilder,
 	handler CallbackHandler,
 	opts ...*ButtonOptions,
 ) *InlineActionBuilder {
@@ -291,9 +296,9 @@ func (b *InlineActionBuilder) buildButtons(update *StateUpdate) *structs.InlineK
 		}
 
 		if val, ok := button.(inlineUrlButton); ok {
-			row["url"] = val.data
+			row["url"] = val.data.String(update)
 		} else {
-			row["callback_data"] = fmt.Sprintf("%s:%s", b.inlineMenu, button.Data())
+			row["callback_data"] = fmt.Sprintf("%s:%s", b.inlineMenu, button.Data(update))
 		}
 
 		rows = append(rows, row)
@@ -306,7 +311,7 @@ func (b *InlineActionBuilder) buildButtons(update *StateUpdate) *structs.InlineK
 	return tools.Keyboards{}.NewInlineKeyboardFromSlicesOfMapWithFormation(rows, b.maxButtonPerRow, b.buttonFormation)
 }
 
-func (b *InlineActionBuilder) getByCallbackActionData() map[string]InlineAction {
+func (b *InlineActionBuilder) getByCallbackActionData(update *StateUpdate) map[string]InlineAction {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -314,7 +319,7 @@ func (b *InlineActionBuilder) getByCallbackActionData() map[string]InlineAction 
 
 	for _, button := range b.buttons {
 		if _, ok := button.(inlineUrlButton); !ok {
-			sp := strings.Split(button.Data(), ":")
+			sp := strings.Split(button.Data(update), ":")
 			data[sp[0]] = button
 		}
 	}
