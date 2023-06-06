@@ -55,13 +55,13 @@ type TextBuilderF struct {
 }
 
 func (t TextBuilderF) String(update *StateUpdate) string {
-	var str string
+	var str []any
 
 	for _, builder := range t.builders {
-		str += builder.String(update)
+		str = append(str, builder.String(update))
 	}
 
-	return fmt.Sprintf(t.placeholder, str)
+	return fmt.Sprintf(t.placeholder, str...)
 }
 
 // NewTextBuilderF returns a new TextBuilderF
