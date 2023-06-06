@@ -1,5 +1,7 @@
 package telejoon
 
+import "fmt"
+
 type TextBuilder interface {
 	String(update *StateUpdate) string
 }
@@ -45,6 +47,29 @@ func (t UpdateKeyTextBuilder) String(update *StateUpdate) string {
 	}
 
 	return ""
+}
+
+type TextBuilderF struct {
+	builders    []TextBuilder
+	placeholder string
+}
+
+func (t TextBuilderF) String(update *StateUpdate) string {
+	var str string
+
+	for _, builder := range t.builders {
+		str += builder.String(update)
+	}
+
+	return fmt.Sprintf(t.placeholder, str)
+}
+
+// NewTextBuilderF returns a new TextBuilderF
+func NewTextBuilderF(placeholder string, builders ...TextBuilder) TextBuilderF {
+	return TextBuilderF{
+		builders:    builders,
+		placeholder: placeholder,
+	}
 }
 
 // NewUpdateKeyText returns a new UpdateKeyTextBuilder
