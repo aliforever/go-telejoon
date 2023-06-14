@@ -26,4 +26,4 @@ type PanicHandler func(
 	update tgbotapi.Update,
 	err interface{},
 	trace string,
-) (SwitchAction, bool)
+)

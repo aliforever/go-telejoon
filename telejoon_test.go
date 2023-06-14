@@ -81,10 +81,8 @@ func TestStart(t *testing.T) {
 						"Welcome",
 						telejoon.NewOptions().SetErrorGroupID(81997375)).
 						WithLanguageConfig(languageConfig).
-						WithPanicHandler(func(client *tgbotapi.TelegramBot, update tgbotapi.Update, err any, stack string) (telejoon.SwitchAction, bool) {
+						WithPanicHandler(func(client *tgbotapi.TelegramBot, update tgbotapi.Update, err any, stack string) {
 							fmt.Println("Panic Handler", update, "\n", stack)
-
-							return nil, true
 						}).
 						AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate) (telejoon.SwitchAction, bool) {
 							if update.Update.Message.Text == "panic" {
