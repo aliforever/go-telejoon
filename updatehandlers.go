@@ -20,3 +20,10 @@ type Middleware struct {
 func NewMiddleware(handler UpdateHandler) Middleware {
 	return Middleware{handler}
 }
+
+type PanicHandler func(
+	client *tgbotapi.TelegramBot,
+	update tgbotapi.Update,
+	err interface{},
+	trace string,
+) (SwitchAction, bool)

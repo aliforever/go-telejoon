@@ -5,6 +5,7 @@ import (
 	"fmt"
 	tgbotapi "github.com/aliforever/go-telegram-bot-api"
 	"github.com/aliforever/go-telegram-bot-api/structs"
+	"runtime/debug"
 	"strings"
 	"sync"
 )
@@ -15,6 +16,8 @@ type EngineWithPrivateStateHandlers struct {
 	userRepository UserRepository
 
 	m sync.Mutex
+
+	panicHandler PanicHandler
 
 	middlewares []UpdateHandler
 
@@ -54,6 +57,18 @@ func (e *EngineWithPrivateStateHandlers) AddStaticMenu(
 	defer e.m.Unlock()
 
 	e.staticMenus[state] = handler
+
+	return e
+}
+
+func (e *EngineWithPrivateStateHandlers) WithPanicHandler(
+	handler PanicHandler,
+) *EngineWithPrivateStateHandlers {
+
+	e.m.Lock()
+	defer e.m.Unlock()
+
+	e.panicHandler = handler
 
 	return e
 }
@@ -157,6 +172,14 @@ func (e *EngineWithPrivateStateHandlers) WithLanguageConfig(
 }
 
 func (e *EngineWithPrivateStateHandlers) Process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
+	if e.panicHandler != nil {
+		defer func() {
+			if r := recover(); r != nil {
+				e.panicHandler(client, update, r, string(debug.Stack()))
+			}
+		}()
+	}
+
 	userState, err := e.processUserState(update)
 	if err != nil {
 		e.onErr(client, update, err)

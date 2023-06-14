@@ -81,7 +81,15 @@ func TestStart(t *testing.T) {
 						"Welcome",
 						telejoon.NewOptions().SetErrorGroupID(81997375)).
 						WithLanguageConfig(languageConfig).
+						WithPanicHandler(func(client *tgbotapi.TelegramBot, update tgbotapi.Update, err any, stack string) (telejoon.SwitchAction, bool) {
+							fmt.Println("Panic Handler", update, "\n", stack)
+
+							return nil, true
+						}).
 						AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate) (telejoon.SwitchAction, bool) {
+							if update.Update.Message.Text == "panic" {
+								panic("Panic Test")
+							}
 							return nil, true
 						}).
 						AddStaticMenu("Welcome",
@@ -119,21 +127,21 @@ func TestStart(t *testing.T) {
 						AddInlineMenu("Info", telejoon.
 							NewInlineMenu(telejoon.NewStaticText("Info Inline Menu"),
 								telejoon.NewInlineActionBuilder().
-									AddUrlButton(telejoon.NewStaticText("Google"), "https://google.com").
-									AddAlertButton(telejoon.NewLanguageKeyText("Info.Hello"), "say_hello_0", "HI!").
-									AddAlertButton(telejoon.NewStaticText("Hello"), "say_hello", "Hello Friend").
-									AddAlertButton(telejoon.NewStaticText("Hello 2"), "say_hello_2", "Hello Friend 2").
-									AddAlertButton(telejoon.NewStaticText("Hello 3"), "say_hello_3", "Hello Friend 3").
-									AddCallbackButton(telejoon.NewStaticText("Callback 1"), "callback_1:data", callbackHandler).
-									AddCallbackButton(telejoon.NewStaticText("Callback 2"), "callback_1:data2", callbackHandler).
-									AddInlineMenuButtonWithEdit(telejoon.NewStaticText("Change Menu to Info 2"), "Info2", "Info2").
+									AddUrlButton(telejoon.NewStaticText("Google"), telejoon.NewStaticText("https://google.com")).
+									AddAlertButton(telejoon.NewLanguageKeyText("Info.Hello"), telejoon.NewStaticText("say_hello_0"), "HI!").
+									AddAlertButton(telejoon.NewStaticText("Hello"), telejoon.NewStaticText("say_hello"), "Hello Friend").
+									AddAlertButton(telejoon.NewStaticText("Hello 2"), telejoon.NewStaticText("say_hello_2"), "Hello Friend 2").
+									AddAlertButton(telejoon.NewStaticText("Hello 3"), telejoon.NewStaticText("say_hello_3"), "Hello Friend 3").
+									AddCallbackButton(telejoon.NewStaticText("Callback 1"), telejoon.NewStaticText("callback_1:data"), callbackHandler).
+									AddCallbackButton(telejoon.NewStaticText("Callback 2"), telejoon.NewStaticText("callback_1:data2"), callbackHandler).
+									AddInlineMenuButtonWithEdit(telejoon.NewStaticText("Change Menu to Info 2"), telejoon.NewStaticText("Info2"), "Info2").
 									SetMaxButtonPerRow(3))).
 						AddInlineMenu("Info2", telejoon.
 							NewInlineMenu(
 								telejoon.NewStaticText("Info2 Inline Menu"), telejoon.NewInlineActionBuilder().
-									AddAlertButtonWithDialog(telejoon.NewStaticText("Hello"), "say_hello_4", "Hello Friend").
-									AddInlineMenuButtonWithEdit(telejoon.NewStaticText("CustomInline"), "CustomInline", "CustomInline").
-									AddInlineMenuButtonWithEdit(telejoon.NewStaticText("Back"), "Info", "Info"))).
+									AddAlertButtonWithDialog(telejoon.NewStaticText("Hello"), telejoon.NewStaticText("say_hello_4"), "Hello Friend").
+									AddInlineMenuButtonWithEdit(telejoon.NewStaticText("CustomInline"), telejoon.NewStaticText("CustomInline"), "CustomInline").
+									AddInlineMenuButtonWithEdit(telejoon.NewStaticText("Back"), telejoon.NewStaticText("Info"), "Info"))).
 						AddInlineMenu("CustomInline", CustomInlineMenu()).
 						AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate) (telejoon.SwitchAction, bool) {
 							fmt.Println("update inside middleware", update)
@@ -191,7 +199,7 @@ func callbackHandler(
 func CustomInlineMenu() *telejoon.InlineMenu {
 	deferredBuilder := func(update *telejoon.StateUpdate) *telejoon.InlineActionBuilder {
 		return telejoon.NewInlineActionBuilder().
-			AddAlertButtonWithDialog(telejoon.NewStaticText("Hello"), "say_hello_4", "Hello Friend")
+			AddAlertButtonWithDialog(telejoon.NewStaticText("Hello"), telejoon.NewStaticText("say_hello_4"), "Hello Friend")
 	}
 
 	return telejoon.
