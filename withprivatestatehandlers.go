@@ -579,6 +579,19 @@ func (e *EngineWithPrivateStateHandlers) userLanguage(userID int64) (*Language, 
 func (e *EngineWithPrivateStateHandlers) processInlineCallbackHandler(
 	client *tgbotapi.TelegramBot, update *StateUpdate, menu *InlineMenu, data []string) error {
 
+	if middlewares := menu.getMiddlewares(); len(middlewares) > 0 {
+		for _, middleware := range middlewares {
+			switchAction, pass := middleware.Handle(client, update)
+			if err := e.processSwitchAction(switchAction, update, client); err != nil {
+				return err
+			}
+
+			if !pass {
+				return nil
+			}
+		}
+	}
+
 	menuActionBuilder := menu.processActionBuilder(update)
 	if menuActionBuilder == nil {
 		return fmt.Errorf("inline_menu_action_builder_not_set: %s", menu.callbackPrefix)
