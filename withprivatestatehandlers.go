@@ -379,8 +379,8 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 
 	actionBuilder := handler.processActionBuilder(update)
 
-	if update.Update.Message != nil && update.Update.Message.Text != "" {
-		if !update.IsSwitched {
+	if !update.IsSwitched {
+		if update.Update.Message != nil && update.Update.Message.Text != "" {
 			buttonText := update.Update.Message.Text
 
 			if actionBuilder != nil {
@@ -436,6 +436,42 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 				}
 			}
 		}
+
+		if handler.dynamicHandlers != nil {
+			handlerName := ""
+			if update.Update.Message.Video != nil {
+				handlerName = VideoHandler
+			} else if update.Update.Message.Photo != nil {
+				handlerName = PhotoHandler
+			} else if update.Update.Message.Document != nil {
+				handlerName = DocumentHandler
+			} else if update.Update.Message.Voice != nil {
+				handlerName = VoiceHandler
+			} else if update.Update.Message.Audio != nil {
+				handlerName = AudioHandler
+			} else if update.Update.Message.Sticker != nil {
+				handlerName = StickerHandler
+			} else if update.Update.Message.Location != nil {
+				handlerName = LocationHandler
+			} else if update.Update.Message.Contact != nil {
+				handlerName = ContactHandler
+			} else if update.Update.Message.VideoNote != nil {
+				handlerName = VideoNoteHandler
+			}
+
+			if handlerName != "" && handler.dynamicHandlers[handlerName] != nil {
+				switchAction, pass := handler.dynamicHandlers[VideoHandler].Handle(client, update)
+				if err := e.processSwitchAction(switchAction, update, client); err != nil {
+					e.onErr(client, update.Update, err)
+					return
+				}
+
+				if !pass {
+					return
+				}
+			}
+		}
+
 	}
 
 	var replyMarkup *structs.ReplyKeyboardMarkup
