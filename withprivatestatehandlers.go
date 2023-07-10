@@ -1,6 +1,7 @@
 package telejoon
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	tgbotapi "github.com/aliforever/go-telegram-bot-api"
@@ -196,6 +197,8 @@ func (e *EngineWithPrivateStateHandlers) Process(client *tgbotapi.TelegramBot, u
 	from := update.From()
 
 	if from == nil {
+		j, _ := json.Marshal(update)
+		e.onErr(client, update, fmt.Errorf("update.From() is nil: %s", string(j)))
 		return
 	}
 
@@ -578,7 +581,7 @@ func (e *EngineWithPrivateStateHandlers) processUserState(update tgbotapi.Update
 
 	err := e.userRepository.Upsert(from)
 	if err != nil {
-
+		return "", fmt.Errorf("cant_store_user: %s", err)
 	}
 
 	if e.defaultStateName == "" {
