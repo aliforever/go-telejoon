@@ -463,7 +463,7 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 			}
 
 			if handlerName != "" && handler.dynamicHandlers[handlerName] != nil {
-				switchAction, pass := handler.dynamicHandlers[VideoHandler].Handle(client, update)
+				switchAction, pass := handler.dynamicHandlers[handlerName].Handle(client, update)
 				if err := e.processSwitchAction(switchAction, update, client); err != nil {
 					e.onErr(client, update.Update, err)
 					return
