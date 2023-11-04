@@ -103,6 +103,11 @@ func (g *Generator) Generate() error {
 		return err
 	}
 
+	err = g.createWelcome()
+	if err != nil {
+		return err
+	}
+
 	err = g.goModInit()
 	if err != nil {
 		return err
@@ -274,6 +279,10 @@ func (g *Generator) createModelsUserState() error {
 
 func (g *Generator) createBot() error {
 	return os.WriteFile("lib/bot/bot.go", []byte(g.templateBot()), os.ModePerm)
+}
+
+func (g *Generator) createWelcome() error {
+	return os.WriteFile("lib/bot/welcome.go", []byte(g.templateWelcome()), os.ModePerm)
 }
 
 // templateMain is the template for cmd/bot/main.go file
@@ -507,6 +516,7 @@ import (
 	"{{MODULE_PATH}}/lib/bot/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type UserLanguage interface {
@@ -553,6 +563,7 @@ import (
 	"{{MODULE_PATH}}/lib/bot/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type UserState interface {
@@ -734,6 +745,8 @@ func (b *Bot) NewProcessor() *telejoon.EngineWithPrivateStateHandlers {
 		options...,
 	).WithLanguageConfig(b.languageConfig)
 
+	processor.AddStaticMenu("Welcome", b.Welcome())
+
 	return processor
 }
 
@@ -745,6 +758,26 @@ func (b *Bot) Start() {
 `
 
 	return g.replaceModulePath(tpl)
+}
+
+// templateWelcome is the template for lib/bot/welcome.go file
+func (g *Generator) templateWelcome() string {
+	tpl := `package bot
+
+import (
+	"github.com/aliforever/go-telejoon"
+)
+
+func (b *Bot) Welcome() *telejoon.StaticMenu {
+	actionHandlers := telejoon.NewStaticActionBuilder().
+		AddStateButton(telejoon.NewLanguageKeyText("Welcome.ChangeLanguageButton"), "ChooseLanguage").
+		SetButtonFormation(1).
+		SetMaxButtonPerRow(2)
+
+	return telejoon.NewStaticMenu(telejoon.NewLanguageKeyText("Welcome.Main"), actionHandlers)
+}`
+
+	return tpl
 }
 
 func (g *Generator) replaceModulePath(tpl string) string {
