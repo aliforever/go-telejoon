@@ -8,3 +8,13 @@ Telegram bot framework using generics making it easier to write bots.
 
 ## Docs
 [Here](https://pkg.go.dev/github.com/aliforever/go-telejoon)
+
+## Install Project Generator:
+```bash
+go install github.com/aliforever/go-telejoon/tgbot
+```
+
+## Generate Project:
+```bash
+tgbot --token=BOT_TOKEN_HERE --module_path=MODULE_PATH_HERE
+```
