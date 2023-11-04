@@ -1,6 +1,6 @@
 package telejoon
 
-import tgbotapi "github.com/aliforever/go-telegram-bot-api"
+import "github.com/aliforever/go-telegram-bot-api"
 
 type Handler interface {
 	Handle(client *tgbotapi.TelegramBot, update *StateUpdate) (SwitchAction, bool)

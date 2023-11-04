@@ -2,7 +2,7 @@ package telejoon
 
 import (
 	"fmt"
-	tgbotapi "github.com/aliforever/go-telegram-bot-api"
+	"github.com/aliforever/go-telegram-bot-api"
 	"github.com/aliforever/go-telegram-bot-api/structs"
 	"github.com/aliforever/go-telegram-bot-api/tools"
 	"strings"

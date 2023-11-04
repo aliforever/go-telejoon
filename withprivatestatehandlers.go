@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	tgbotapi "github.com/aliforever/go-telegram-bot-api"
+	"github.com/aliforever/go-telegram-bot-api"
 	"github.com/aliforever/go-telegram-bot-api/structs"
 	"runtime/debug"
 	"strings"
@@ -207,7 +207,7 @@ func (e *EngineWithPrivateStateHandlers) Process(client *tgbotapi.TelegramBot, u
 	if e.languageConfig != nil {
 		userLanguage, err := e.languageConfig.repo.GetUserLanguage(from.Id)
 		if err != nil {
-			if err == UserLanguageNotFoundErr && e.languageConfig.forceChooseLanguage {
+			if e.languageConfig.forceChooseLanguage {
 				if update.CallbackQuery != nil {
 					go func() {
 						_, err := client.Send(client.AnswerCallbackQuery().

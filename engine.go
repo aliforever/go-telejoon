@@ -3,7 +3,7 @@ package telejoon
 import (
 	"encoding/json"
 	"fmt"
-	tgbotapi "github.com/aliforever/go-telegram-bot-api"
+	"github.com/aliforever/go-telegram-bot-api"
 	"log"
 )
 
@@ -36,6 +36,7 @@ func (t *engine) onErr(
 
 	if len(t.opts) > 0 {
 		j, _ := json.Marshal(update)
+
 		if t.opts[0].ErrorGroupID == 0 && t.opts[0].Logger == nil {
 			log.Printf("Error: %s\nUpdate: %s", err.Error(), string(j))
 			return
