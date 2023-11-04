@@ -29,6 +29,11 @@ func (l *LanguageConfig) WithChangeLanguageMenu(state string, forceChooseLanguag
 	return l
 }
 
+// GetLanguage By Tag
+func (l *LanguageConfig) GetLanguage(tag string) *Language {
+	return l.languages.GetByTag(tag)
+}
+
 type Language struct {
 	tag       string
 	localizer *i18n.Localizer
@@ -107,6 +112,7 @@ func (lb *LanguagesBuilder) Build() (*Languages, error) {
 
 	for i := range lb.messageFilePaths {
 		path := lb.messageFilePaths[i]
+
 		if msgFile, err := lb.defaultBundle.LoadMessageFile(path); err != nil {
 			return nil, err
 		} else {
