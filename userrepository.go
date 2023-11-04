@@ -6,9 +6,9 @@ import (
 )
 
 type UserRepository interface {
-	Upsert(user *structs.User) error
-	SetState(id int64, state string) error
-	GetState(id int64) (string, error)
+	UpsertUser(user *structs.User) error
+	SetUserState(id int64, state string) error
+	GetUserState(id int64) (string, error)
 }
 
 type UserI[T any] interface {
@@ -28,18 +28,18 @@ func NewDefaultUserRepository() UserRepository {
 	}
 }
 
-func (u *defaultUserRepository) Upsert(user *structs.User) error {
+func (u *defaultUserRepository) UpsertUser(user *structs.User) error {
 	u.users.Store(user.Id, user)
 
 	return nil
 }
 
-func (u *defaultUserRepository) SetState(id int64, state string) error {
+func (u *defaultUserRepository) SetUserState(id int64, state string) error {
 	u.states.Store(id, state)
 	return nil
 }
 
-func (u *defaultUserRepository) GetState(id int64) (string, error) {
+func (u *defaultUserRepository) GetUserState(id int64) (string, error) {
 	if state, ok := u.states.Load(id); ok {
 		return state.(string), nil
 	}

@@ -557,7 +557,7 @@ func (e *EngineWithPrivateStateHandlers) switchState(
 	userID int64, nextState string, client *tgbotapi.TelegramBot, stateUpdate *StateUpdate) error {
 
 	if handler := e.staticMenus[nextState]; handler != nil {
-		if err := e.userRepository.SetState(userID, nextState); err != nil {
+		if err := e.userRepository.SetUserState(userID, nextState); err != nil {
 			return fmt.Errorf("error_setting_user_state: %d, %w", userID, err)
 		}
 
@@ -579,7 +579,7 @@ func (e *EngineWithPrivateStateHandlers) processUserState(update tgbotapi.Update
 		return "", errors.New("empty_from")
 	}
 
-	err := e.userRepository.Upsert(from)
+	err := e.userRepository.UpsertUser(from)
 	if err != nil {
 		return "", fmt.Errorf("cant_store_user: %s", err)
 	}
@@ -588,10 +588,10 @@ func (e *EngineWithPrivateStateHandlers) processUserState(update tgbotapi.Update
 		return "", fmt.Errorf("empty_default_state_name")
 	}
 
-	userState, err := e.userRepository.GetState(from.Id)
+	userState, err := e.userRepository.GetUserState(from.Id)
 	if err != nil || userState == "" {
 		userState = e.defaultStateName
-		err = e.userRepository.SetState(from.Id, userState)
+		err = e.userRepository.SetUserState(from.Id, userState)
 		if err != nil {
 			return "", fmt.Errorf("store_user_state: %w", err)
 		}
