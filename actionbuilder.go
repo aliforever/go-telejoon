@@ -91,6 +91,7 @@ type stateButton struct {
 	baseButton
 
 	state string
+	hook  UpdateHandler
 }
 
 // rawButton is only a raw button that does nothing but sends the button name.
@@ -194,6 +195,29 @@ func (b *ActionBuilder) AddStateButton(button TextBuilder, state string, opts ..
 			button:  button,
 			options: opts,
 		}, state: state,
+	})
+
+	return b
+}
+
+// AddStateButtonWithHook adds a state action to the ActionBuilder with hook.
+func (b *ActionBuilder) AddStateButtonWithHook(
+	button TextBuilder,
+	state string,
+	hook UpdateHandler,
+	opts ...*ButtonOptions,
+) *ActionBuilder {
+
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	b.buttons = append(b.buttons, stateButton{
+		baseButton: baseButton{
+			button:  button,
+			options: opts,
+		},
+		state: state,
+		hook:  hook,
 	})
 
 	return b

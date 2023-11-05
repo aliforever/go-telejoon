@@ -399,7 +399,19 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 							err = fmt.Errorf("error_sending_message_to_user: %d, %w", userID, err)
 						}
 					case stateButton:
-						if err := e.switchState(userID, a.state, client, update); err != nil {
+						if a.hook != nil {
+							switchAction, pass := a.hook.Handle(client, update)
+							if err = e.processSwitchAction(switchAction, update, client); err != nil {
+								e.onErr(client, update.Update, err)
+								return
+							}
+
+							if !pass {
+								return
+							}
+						}
+
+						if err = e.switchState(userID, a.state, client, update); err != nil {
 							err = fmt.Errorf("error_switching_state: %d, %w", userID, err)
 						}
 					case inlineMenuButton:
