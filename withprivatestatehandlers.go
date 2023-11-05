@@ -474,8 +474,18 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 				handlerName = VideoNoteHandler
 			}
 
-			if handlerName != "" && handler.dynamicHandlers[handlerName] != nil {
-				switchAction, pass := handler.dynamicHandlers[handlerName].Handle(client, update)
+			var targetHandler Handler
+
+			if handlerName != "" {
+				targetHandler = handler.dynamicHandlers[handlerName]
+
+				if targetHandler == nil {
+					targetHandler = handler.dynamicHandlers[DefaultHandler]
+				}
+			}
+
+			if targetHandler != nil {
+				switchAction, pass := targetHandler.Handle(client, update)
 				if err := e.processSwitchAction(switchAction, update, client); err != nil {
 					e.onErr(client, update.Update, err)
 					return
@@ -486,7 +496,6 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 				}
 			}
 		}
-
 	}
 
 	var replyMarkup *structs.ReplyKeyboardMarkup
