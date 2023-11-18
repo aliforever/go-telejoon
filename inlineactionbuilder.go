@@ -269,7 +269,11 @@ func (b *InlineActionBuilder) Build(_ *StateUpdate) *InlineActionBuilder {
 }
 
 // buildButtons builds the buttons.
-func (b *InlineActionBuilder) buildButtons(update *StateUpdate) *structs.InlineKeyboardMarkup {
+func (b *InlineActionBuilder) buildButtons(
+	update *StateUpdate,
+	reverseButtonOrderInRow bool,
+) *structs.InlineKeyboardMarkup {
+
 	if len(b.buttons) == 0 {
 		return nil
 	}
@@ -308,7 +312,12 @@ func (b *InlineActionBuilder) buildButtons(update *StateUpdate) *structs.InlineK
 		}
 	}
 
-	return tools.Keyboards{}.NewInlineKeyboardFromSlicesOfMapWithFormation(rows, b.maxButtonPerRow, b.buttonFormation)
+	return tools.Keyboards{}.NewInlineKeyboardFromSlicesOfMapWithFormation(
+		rows,
+		b.maxButtonPerRow,
+		b.buttonFormation,
+		reverseButtonOrderInRow,
+	)
 }
 
 func (b *InlineActionBuilder) getByCallbackActionData(update *StateUpdate) map[string]InlineAction {

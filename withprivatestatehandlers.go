@@ -550,7 +550,10 @@ func (e *EngineWithPrivateStateHandlers) processInlineHandler(
 		return fmt.Errorf("inline_menu_action_builder_not_set: %s", menuName)
 	}
 
-	markup := actionBuilder.buildButtons(update)
+	markup := actionBuilder.buildButtons(
+		update,
+		update.Language().rtl && e.languageConfig != nil && e.languageConfig.reverseButtonOrderInRowForRTL,
+	)
 
 	replyText := menu.processTextBuilder(update)
 	if replyText == "" {
