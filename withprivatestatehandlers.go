@@ -480,7 +480,9 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 			var targetHandler = handler.dynamicHandlers[DefaultHandler]
 
 			if handlerName != "" {
-				targetHandler = handler.dynamicHandlers[handlerName]
+				if availableHandler := handler.dynamicHandlers[handlerName]; availableHandler != nil {
+					targetHandler = availableHandler
+				}
 			}
 
 			if targetHandler != nil {
