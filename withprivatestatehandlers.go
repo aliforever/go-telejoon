@@ -456,6 +456,7 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 
 		if handler.dynamicHandlers != nil {
 			handlerName := ""
+
 			if update.Update.Message.Video != nil {
 				handlerName = VideoHandler
 			} else if update.Update.Message.Photo != nil {
@@ -476,14 +477,10 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 				handlerName = VideoNoteHandler
 			}
 
-			var targetHandler Handler
+			var targetHandler = handler.dynamicHandlers[DefaultHandler]
 
 			if handlerName != "" {
 				targetHandler = handler.dynamicHandlers[handlerName]
-
-				if targetHandler == nil {
-					targetHandler = handler.dynamicHandlers[DefaultHandler]
-				}
 			}
 
 			if targetHandler != nil {
