@@ -327,7 +327,9 @@ func (e *EngineWithPrivateStateHandlers) canProcess(update tgbotapi.Update) bool
 }
 
 func (e *EngineWithPrivateStateHandlers) processCallbackQuery(
-	client *tgbotapi.TelegramBot, update *StateUpdate) {
+	client *tgbotapi.TelegramBot,
+	update *StateUpdate,
+) {
 
 	if update.Update.CallbackQuery.Data == "" {
 		return
@@ -501,7 +503,10 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 	var replyMarkup *structs.ReplyKeyboardMarkup
 
 	if actionBuilder != nil {
-		replyMarkup = actionBuilder.buildButtons(update)
+		replyMarkup = actionBuilder.buildButtons(
+			update,
+			update.Language().rtl && e.languageConfig != nil && e.languageConfig.reverseButtonOrderInRowForRTL,
+		)
 	}
 
 	if replyText := handler.processReplyText(update); replyText != "" {

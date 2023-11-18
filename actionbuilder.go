@@ -124,9 +124,8 @@ type ActionBuilder struct {
 	buttons  []Action
 	commands []Action
 
-	buttonFormation          []int
-	maxButtonPerRow          int
-	reverseButtonOrderInRows bool
+	buttonFormation []int
+	maxButtonPerRow int
 }
 
 // NewStaticActionBuilder creates a new ActionBuilder.
@@ -149,16 +148,6 @@ func (b *ActionBuilder) SetButtonFormation(formation ...int) *ActionBuilder {
 	defer b.locker.Unlock()
 
 	b.buttonFormation = formation
-
-	return b
-}
-
-// ReverseButtonOrderInRows reverses the order of buttons in rows.
-func (b *ActionBuilder) ReverseButtonOrderInRows() *ActionBuilder {
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.reverseButtonOrderInRows = true
 
 	return b
 }
@@ -334,7 +323,7 @@ func (b *ActionBuilder) getButtonByButton(update *StateUpdate, button string) Ac
 }
 
 // buildButtons builds the buttons.
-func (b *ActionBuilder) buildButtons(update *StateUpdate) *structs.ReplyKeyboardMarkup {
+func (b *ActionBuilder) buildButtons(update *StateUpdate, reverseButtonOrderInRows bool) *structs.ReplyKeyboardMarkup {
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
@@ -372,6 +361,6 @@ func (b *ActionBuilder) buildButtons(update *StateUpdate) *structs.ReplyKeyboard
 		newButtons,
 		b.maxButtonPerRow,
 		b.buttonFormation,
-		b.reverseButtonOrderInRows,
+		reverseButtonOrderInRows,
 	)
 }

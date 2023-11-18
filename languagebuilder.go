@@ -10,8 +10,9 @@ type LanguageConfig struct {
 	languages *Languages
 	repo      UserLanguageRepository
 
-	forceChooseLanguage bool
-	changeLanguageState string
+	forceChooseLanguage           bool
+	changeLanguageState           string
+	reverseButtonOrderInRowForRTL bool
 }
 
 func NewLanguageConfig(languages *Languages, repo UserLanguageRepository) *LanguageConfig {
@@ -29,6 +30,13 @@ func (l *LanguageConfig) WithChangeLanguageMenu(state string, forceChooseLanguag
 	return l
 }
 
+// WithReverseButtonOrderInRowForRTL sets the reverse button order in row for RTL languages.
+func (l *LanguageConfig) WithReverseButtonOrderInRowForRTL() *LanguageConfig {
+	l.reverseButtonOrderInRowForRTL = true
+
+	return l
+}
+
 // GetLanguage By Tag
 func (l *LanguageConfig) GetLanguage(tag string) *Language {
 	return l.languages.GetByTag(tag)
@@ -36,6 +44,7 @@ func (l *LanguageConfig) GetLanguage(tag string) *Language {
 
 type Language struct {
 	tag       string
+	rtl       bool
 	localizer *i18n.Localizer
 }
 
@@ -88,13 +97,15 @@ func (l *Languages) GetByTag(tag string) *Language {
 
 type LanguagesBuilder struct {
 	defaultBundle    *i18n.Bundle
+	rtlLanguageTags  []language.Tag
 	unmarshalFuncs   map[string]i18n.UnmarshalFunc
 	messageFilePaths []string
 }
 
-func NewLanguageBuilder(defaultBundle language.Tag) *LanguagesBuilder {
+func NewLanguageBuilder(defaultBundle language.Tag, rtlLanguageTags ...language.Tag) *LanguagesBuilder {
 	return &LanguagesBuilder{
-		defaultBundle: i18n.NewBundle(defaultBundle),
+		defaultBundle:   i18n.NewBundle(defaultBundle),
+		rtlLanguageTags: rtlLanguageTags,
 	}
 }
 
@@ -116,8 +127,18 @@ func (lb *LanguagesBuilder) Build() (*Languages, error) {
 		if msgFile, err := lb.defaultBundle.LoadMessageFile(path); err != nil {
 			return nil, err
 		} else {
+			isRtl := false
+
+			for j := range lb.rtlLanguageTags {
+				if msgFile.Tag == lb.rtlLanguageTags[j] {
+					isRtl = true
+					break
+				}
+			}
+
 			localizers = append(localizers, Language{
 				tag:       msgFile.Tag.String(),
+				rtl:       isRtl,
 				localizer: i18n.NewLocalizer(lb.defaultBundle, msgFile.Tag.String()),
 			})
 		}
