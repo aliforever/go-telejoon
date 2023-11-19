@@ -52,10 +52,13 @@ type stateCommand struct {
 
 type baseButtonOptions interface {
 	Options() *ButtonOptions
+	CanBeShown(update *StateUpdate) bool
 }
 
 type baseButton struct {
 	button TextBuilder
+
+	condition func(update *StateUpdate) bool
 
 	options []*ButtonOptions
 }
@@ -70,6 +73,10 @@ func (t baseButton) Options() *ButtonOptions {
 	}
 
 	return t.options[0]
+}
+
+func (t baseButton) CanBeShown(update *StateUpdate) bool {
+	return t.condition == nil || t.condition(update)
 }
 
 // textButton is a button that sends a text message when clicked.
@@ -161,6 +168,29 @@ func (b *ActionBuilder) AddTextButton(button TextBuilder, text TextBuilder, opts
 		baseButton: baseButton{
 			button:  button,
 			options: opts,
+		},
+		text: text,
+	})
+
+	return b
+}
+
+// AddConditionalTextButton adds a textHandler action to the ActionBuilder with a condition.
+func (b *ActionBuilder) AddConditionalTextButton(
+	cond func(update *StateUpdate) bool,
+	button TextBuilder,
+	text TextBuilder,
+	opts ...*ButtonOptions,
+) *ActionBuilder {
+
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	b.buttons = append(b.buttons, textButton{
+		baseButton: baseButton{
+			button:    button,
+			condition: cond,
+			options:   opts,
 		},
 		text: text,
 	})
@@ -339,6 +369,10 @@ func (b *ActionBuilder) buildButtons(update *StateUpdate, reverseButtonOrderInRo
 		shouldBreakAfter := false
 
 		if opts, ok := button.(baseButtonOptions); ok {
+			if !opts.CanBeShown(update) {
+				continue
+			}
+
 			if btnOpts := opts.Options(); btnOpts != nil {
 				if btnOpts.breakBefore {
 					newButtons = append(newButtons, "")

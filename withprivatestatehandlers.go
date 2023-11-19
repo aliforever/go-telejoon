@@ -364,7 +364,11 @@ func (e *EngineWithPrivateStateHandlers) processCallbackQuery(
 }
 
 func (e *EngineWithPrivateStateHandlers) processStaticHandler(
-	userID int64, handler *StaticMenu, client *tgbotapi.TelegramBot, update *StateUpdate) {
+	userID int64,
+	handler *StaticMenu,
+	client *tgbotapi.TelegramBot,
+	update *StateUpdate,
+) {
 
 	for _, middleware := range handler.middlewares {
 		if middleware.UpdateHandler == nil {
@@ -372,6 +376,7 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 		}
 
 		switchAction, pass := middleware.Handle(client, update)
+
 		if err := e.processSwitchAction(switchAction, update, client); err != nil {
 			e.onErr(client, update.Update, err)
 			return
@@ -487,6 +492,7 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 
 			if targetHandler != nil {
 				switchAction, pass := targetHandler.Handle(client, update)
+
 				if err := e.processSwitchAction(switchAction, update, client); err != nil {
 					e.onErr(client, update.Update, err)
 					return
@@ -705,7 +711,10 @@ func (e *EngineWithPrivateStateHandlers) processInlineCallbackHandler(
 }
 
 func (e *EngineWithPrivateStateHandlers) processSwitchAction(
-	action SwitchAction, update *StateUpdate, client *tgbotapi.TelegramBot) error {
+	action SwitchAction,
+	update *StateUpdate,
+	client *tgbotapi.TelegramBot,
+) error {
 
 	if action == nil {
 		return nil
