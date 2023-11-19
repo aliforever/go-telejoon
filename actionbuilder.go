@@ -272,6 +272,27 @@ func (b *ActionBuilder) AddRawButton(button TextBuilder, opts ...*ButtonOptions)
 	return b
 }
 
+// AddConditionalRawButton adds a raw button to the ActionBuilder with a condition.
+func (b *ActionBuilder) AddConditionalRawButton(
+	cond func(update *StateUpdate) bool,
+	button TextBuilder,
+	opts ...*ButtonOptions,
+) *ActionBuilder {
+
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	b.buttons = append(b.buttons, rawButton{
+		baseButton: baseButton{
+			button:    button,
+			options:   opts,
+			condition: cond,
+		},
+	})
+
+	return b
+}
+
 // AddTextCommand adds a textHandler command to the ActionBuilder.
 func (b *ActionBuilder) AddTextCommand(command TextBuilder, text string) *ActionBuilder {
 	b.locker.Lock()
