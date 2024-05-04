@@ -6,7 +6,8 @@ import (
 )
 
 type StateUpdate struct {
-	storage    *sync.Map
+	storage *sync.Map
+
 	State      string
 	language   *Language
 	Update     tgbotapi.Update

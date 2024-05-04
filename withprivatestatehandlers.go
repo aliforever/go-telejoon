@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/aliforever/go-telegram-bot-api"
-	"github.com/aliforever/go-telegram-bot-api/structs"
 	"runtime/debug"
 	"strings"
 	"sync"
+
+	"github.com/aliforever/go-telegram-bot-api"
+	"github.com/aliforever/go-telegram-bot-api/structs"
 )
 
 type EngineWithPrivateStateHandlers struct {
@@ -508,9 +509,11 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 	var replyMarkup *structs.ReplyKeyboardMarkup
 
 	if actionBuilder != nil {
+		lang := update.Language()
+
 		replyMarkup = actionBuilder.buildButtons(
 			update,
-			update.Language().rtl && e.languageConfig != nil && e.languageConfig.reverseButtonOrderInRowForRTL,
+			lang != nil && lang.rtl && e.languageConfig != nil && e.languageConfig.reverseButtonOrderInRowForRTL,
 		)
 	}
 
