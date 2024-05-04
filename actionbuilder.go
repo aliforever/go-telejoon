@@ -1,9 +1,10 @@
 package telejoon
 
 import (
+	"sync"
+
 	"github.com/aliforever/go-telegram-bot-api/structs"
 	"github.com/aliforever/go-telegram-bot-api/tools"
-	"sync"
 )
 
 type (
@@ -125,11 +126,18 @@ func NewDeferredActionBuilder(
 	return builder
 }
 
+type conditionalButtonFormation struct {
+	cond      func(update *StateUpdate) bool
+	formation []int
+}
+
 type ActionBuilder struct {
 	locker sync.Mutex
 
 	buttons  []Action
 	commands []Action
+
+	conditionalButtonFormations []conditionalButtonFormation
 
 	buttonFormation []int
 	maxButtonPerRow int
@@ -155,6 +163,22 @@ func (b *ActionBuilder) SetButtonFormation(formation ...int) *ActionBuilder {
 	defer b.locker.Unlock()
 
 	b.buttonFormation = formation
+
+	return b
+}
+
+func (b *ActionBuilder) AddConditionalButtonFormation(
+	cond func(update *StateUpdate) bool,
+	formation ...int,
+) *ActionBuilder {
+
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	b.conditionalButtonFormations = append(b.conditionalButtonFormations, conditionalButtonFormation{
+		cond:      cond,
+		formation: formation,
+	})
 
 	return b
 }
@@ -384,6 +408,17 @@ func (b *ActionBuilder) buildButtons(update *StateUpdate, reverseButtonOrderInRo
 
 	newButtons := []string{}
 
+	buttonFormation := b.buttonFormation
+
+	if len(b.conditionalButtonFormations) > 0 {
+		for _, formation := range b.conditionalButtonFormations {
+			if formation.cond(update) {
+				buttonFormation = formation.formation
+				break
+			}
+		}
+	}
+
 	for _, button := range b.buttons {
 		name := button.Name(update)
 
@@ -415,7 +450,7 @@ func (b *ActionBuilder) buildButtons(update *StateUpdate, reverseButtonOrderInRo
 	return tools.Keyboards{}.NewReplyKeyboardFromSliceOfStringsWithFormation(
 		newButtons,
 		b.maxButtonPerRow,
-		b.buttonFormation,
+		buttonFormation,
 		reverseButtonOrderInRows,
 	)
 }
