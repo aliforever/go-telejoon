@@ -7,6 +7,8 @@ github.com/aliforever/go-telegram-bot-api v0.3.8 h1:fy5uSPb4a7dSKQid1RrHzU63Vpya
 github.com/aliforever/go-telegram-bot-api v0.3.8/go.mod h1:Q63fwWkpFCI4YN+duL7rJSrPVNSk9rQqIjZ7KvEyPQ4=
 github.com/aliforever/go-telegram-bot-api v0.3.9 h1:AJFZ07nAoSRr3pKVIcinmLcb/VQAh7va+Upx4Butd9Q=
 github.com/aliforever/go-telegram-bot-api v0.3.9/go.mod h1:5WvBG8vrhhPzXrw+S04x6FddO2ix4z+HMnNOgogzbBU=
+github.com/aliforever/go-telegram-bot-api v0.4.0 h1:vV+HUFtDKATkcAHlU6JfDQ9QivAqCfTufis0v+lqq90=
+github.com/aliforever/go-telegram-bot-api v0.4.0/go.mod h1:tKQUtltz53PQ71lowDvYaxlEXXFCxf1wH9zqAgk/rqM=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

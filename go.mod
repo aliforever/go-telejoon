@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/BurntSushi/toml v1.2.1
-	github.com/aliforever/go-telegram-bot-api v0.3.9
+	github.com/aliforever/go-telegram-bot-api v0.4.0
 	github.com/nicksnyder/go-i18n/v2 v2.2.1
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/text v0.11.0
