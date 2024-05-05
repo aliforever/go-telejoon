@@ -22,91 +22,6 @@ type Action interface {
 	Name(update *StateUpdate) string
 }
 
-type baseCommand struct {
-	command TextBuilder
-}
-
-func (b baseCommand) Name(update *StateUpdate) string {
-	return b.command.String(update)
-}
-
-// textCommand is a command that sends a text message.
-type textCommand struct {
-	baseCommand
-
-	text string
-}
-
-// inlineMenuCommand is a command that is used to switch to an inline menu.
-type inlineMenuCommand struct {
-	baseCommand
-
-	inlineMenu string
-}
-
-// stateCommand is a command that is used to switch to a state.
-type stateCommand struct {
-	baseCommand
-
-	state string
-}
-
-type baseButtonOptions interface {
-	Options() *ButtonOptions
-	CanBeShown(update *StateUpdate) bool
-}
-
-type baseButton struct {
-	button TextBuilder
-
-	condition func(update *StateUpdate) bool
-
-	options []*ButtonOptions
-}
-
-func (t baseButton) Name(update *StateUpdate) string {
-	return t.button.String(update)
-}
-
-func (t baseButton) Options() *ButtonOptions {
-	if len(t.options) == 0 {
-		return nil
-	}
-
-	return t.options[0]
-}
-
-func (t baseButton) CanBeShown(update *StateUpdate) bool {
-	return t.condition == nil || t.condition(update)
-}
-
-// textButton is a button that sends a text message when clicked.
-type textButton struct {
-	baseButton
-
-	text TextBuilder
-}
-
-// inlineMenuButton is a button that switches to an inline menu when clicked.
-type inlineMenuButton struct {
-	baseButton
-
-	inlineMenu string
-}
-
-// stateButton is a button that switches to a state when clicked.
-type stateButton struct {
-	baseButton
-
-	state string
-	hook  UpdateHandler
-}
-
-// rawButton is only a raw button that does nothing but sends the button name.
-type rawButton struct {
-	baseButton
-}
-
 type ActionBuilderKind interface {
 	build(update *StateUpdate) *ActionBuilder
 }
@@ -133,6 +48,8 @@ type conditionalButtonFormation struct {
 
 type ActionBuilder struct {
 	locker sync.Mutex
+
+	definedConditions map[string]func(update *StateUpdate) bool
 
 	buttons  []Action
 	commands []Action
@@ -183,207 +100,6 @@ func (b *ActionBuilder) AddConditionalButtonFormation(
 	return b
 }
 
-// AddTextButton adds a textHandler action to the ActionBuilder.
-func (b *ActionBuilder) AddTextButton(button TextBuilder, text TextBuilder, opts ...*ButtonOptions) *ActionBuilder {
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.buttons = append(b.buttons, textButton{
-		baseButton: baseButton{
-			button:  button,
-			options: opts,
-		},
-		text: text,
-	})
-
-	return b
-}
-
-// AddConditionalTextButton adds a textHandler action to the ActionBuilder with a condition.
-func (b *ActionBuilder) AddConditionalTextButton(
-	cond func(update *StateUpdate) bool,
-	button TextBuilder,
-	text TextBuilder,
-	opts ...*ButtonOptions,
-) *ActionBuilder {
-
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.buttons = append(b.buttons, textButton{
-		baseButton: baseButton{
-			button:    button,
-			condition: cond,
-			options:   opts,
-		},
-		text: text,
-	})
-
-	return b
-}
-
-// AddInlineMenuButton adds an inline menu action to the ActionBuilder.
-func (b *ActionBuilder) AddInlineMenuButton(
-	button TextBuilder,
-	inlineMenu string,
-	opts ...*ButtonOptions,
-) *ActionBuilder {
-
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.buttons = append(b.buttons, inlineMenuButton{
-		baseButton: baseButton{
-			button:  button,
-			options: opts,
-		},
-		inlineMenu: inlineMenu,
-	})
-
-	return b
-}
-
-// AddStateButton adds a state action to the ActionBuilder.
-func (b *ActionBuilder) AddStateButton(button TextBuilder, state string, opts ...*ButtonOptions) *ActionBuilder {
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.buttons = append(b.buttons, stateButton{
-		baseButton: baseButton{
-			button:  button,
-			options: opts,
-		}, state: state,
-	})
-
-	return b
-}
-
-// AddStateButtonWithHook adds a state action to the ActionBuilder with hook.
-func (b *ActionBuilder) AddStateButtonWithHook(
-	button TextBuilder,
-	state string,
-	hook UpdateHandler,
-	opts ...*ButtonOptions,
-) *ActionBuilder {
-
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.buttons = append(b.buttons, stateButton{
-		baseButton: baseButton{
-			button:  button,
-			options: opts,
-		},
-		state: state,
-		hook:  hook,
-	})
-
-	return b
-}
-
-// AddRawButton adds a raw button to the ActionBuilder.
-func (b *ActionBuilder) AddRawButton(button TextBuilder, opts ...*ButtonOptions) *ActionBuilder {
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.buttons = append(b.buttons, rawButton{
-		baseButton: baseButton{
-			button:  button,
-			options: opts,
-		},
-	})
-
-	return b
-}
-
-// AddConditionalRawButton adds a raw button to the ActionBuilder with a condition.
-func (b *ActionBuilder) AddConditionalRawButton(
-	cond func(update *StateUpdate) bool,
-	button TextBuilder,
-	opts ...*ButtonOptions,
-) *ActionBuilder {
-
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.buttons = append(b.buttons, rawButton{
-		baseButton: baseButton{
-			button:    button,
-			options:   opts,
-			condition: cond,
-		},
-	})
-
-	return b
-}
-
-// AddConditionalStateButton adds a state button to the ActionBuilder with a condition.
-func (b *ActionBuilder) AddConditionalStateButton(
-	cond func(update *StateUpdate) bool,
-	button TextBuilder,
-	state string,
-	opts ...*ButtonOptions,
-) *ActionBuilder {
-
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.buttons = append(b.buttons, stateButton{
-		baseButton: baseButton{
-			button:    button,
-			options:   opts,
-			condition: cond,
-		}, state: state,
-	})
-
-	return b
-}
-
-// AddTextCommand adds a textHandler command to the ActionBuilder.
-func (b *ActionBuilder) AddTextCommand(command TextBuilder, text string) *ActionBuilder {
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.commands = append(b.commands, textCommand{
-		baseCommand: baseCommand{
-			command: command,
-		},
-		text: text,
-	})
-
-	return b
-}
-
-// AddInlineMenuCommand adds an inline menu command to the ActionBuilder.
-func (b *ActionBuilder) AddInlineMenuCommand(command TextBuilder, inlineMenu string) *ActionBuilder {
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.commands = append(b.commands, inlineMenuCommand{
-		baseCommand: baseCommand{
-			command: command,
-		},
-		inlineMenu: inlineMenu,
-	})
-
-	return b
-}
-
-// AddStateCommand adds a state command to the ActionBuilder.
-func (b *ActionBuilder) AddStateCommand(command TextBuilder, state string) *ActionBuilder {
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.commands = append(b.commands, stateCommand{
-		baseCommand: baseCommand{
-			command: command,
-		},
-		state: state,
-	})
-
-	return b
-}
-
 // AddCustomButton adds a custom action of button type to the ActionBuilder.
 func (b *ActionBuilder) AddCustomButton(action Action) *ActionBuilder {
 	b.locker.Lock()
@@ -400,6 +116,16 @@ func (b *ActionBuilder) AddCustomCommand(action Action) *ActionBuilder {
 	defer b.locker.Unlock()
 
 	b.commands = append(b.commands, action)
+
+	return b
+}
+
+// DefineCondition defines a condition.
+func (b *ActionBuilder) DefineCondition(name string, cond func(update *StateUpdate) bool) *ActionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	b.definedConditions[name] = cond
 
 	return b
 }
@@ -441,13 +167,21 @@ func (b *ActionBuilder) buildButtons(update *StateUpdate, reverseButtonOrderInRo
 		}
 	}
 
+	definedConditionsResults := make(map[string]bool)
+
+	if len(b.definedConditions) > 0 {
+		for name, cond := range b.definedConditions {
+			definedConditionsResults[name] = cond(update)
+		}
+	}
+
 	for _, button := range b.buttons {
 		name := button.Name(update)
 
 		shouldBreakAfter := false
 
 		if opts, ok := button.(baseButtonOptions); ok {
-			if !opts.CanBeShown(update) {
+			if !opts.CanBeShown(update, definedConditionsResults) {
 				continue
 			}
 
