@@ -10,6 +10,7 @@ type conditionalButtons struct {
 
 func (b *ActionBuilder) AddConditionalButtons(
 	cond func(update *StateUpdate) bool,
+	buttonFormation []int,
 	buttons ...Action,
 ) *ActionBuilder {
 	b.locker.Lock()
@@ -22,7 +23,7 @@ func (b *ActionBuilder) AddConditionalButtons(
 	b.conditionalButtons = append(b.conditionalButtons, conditionalButtons{
 		cond:      cond,
 		buttons:   buttons,
-		formation: b.buttonFormation,
+		formation: buttonFormation,
 	})
 
 	return b
