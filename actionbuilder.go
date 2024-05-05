@@ -182,6 +182,10 @@ func (b *ActionBuilder) buildButtons(update *StateUpdate, reverseButtonOrderInRo
 
 	if len(b.conditionalButtons) > 0 {
 		for _, button := range b.conditionalButtons {
+			if button.cond == nil || !button.cond(update) {
+				continue
+			}
+
 			availableButtons := b.makeButtonsFromActions(update, definedConditionsResults, button.buttons)
 			if len(availableButtons) > 0 {
 				newButtons = append(newButtons, availableButtons...)
