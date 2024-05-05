@@ -125,6 +125,10 @@ func (b *ActionBuilder) DefineCondition(name string, cond func(update *StateUpda
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
+	if b.definedConditions == nil {
+		b.definedConditions = make(map[string]func(update *StateUpdate) bool)
+	}
+
 	b.definedConditions[name] = cond
 
 	return b
