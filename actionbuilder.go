@@ -51,8 +51,9 @@ type ActionBuilder struct {
 
 	definedConditions map[string]func(update *StateUpdate) bool
 
-	buttons  []Action
-	commands []Action
+	conditionalButtons []conditionalButtons
+	buttons            []Action
+	commands           []Action
 
 	conditionalButtonFormations []conditionalButtonFormation
 
@@ -158,7 +159,7 @@ func (b *ActionBuilder) buildButtons(update *StateUpdate, reverseButtonOrderInRo
 		return nil
 	}
 
-	newButtons := []string{}
+	var newButtons []string
 
 	buttonFormation := b.buttonFormation
 
@@ -179,7 +180,40 @@ func (b *ActionBuilder) buildButtons(update *StateUpdate, reverseButtonOrderInRo
 		}
 	}
 
-	for _, button := range b.buttons {
+	if len(b.conditionalButtons) > 0 {
+		for _, button := range b.conditionalButtons {
+			availableButtons := b.makeButtonsFromActions(update, definedConditionsResults, button.buttons)
+			if len(availableButtons) > 0 {
+				newButtons = append(newButtons, availableButtons...)
+
+				if len(button.formation) > 0 {
+					buttonFormation = append(buttonFormation, button.formation...)
+				}
+			}
+		}
+	}
+
+	mainButtons := b.makeButtonsFromActions(update, definedConditionsResults, b.buttons)
+
+	newButtons = append(newButtons, mainButtons...)
+	buttonFormation = append(buttonFormation, b.buttonFormation...)
+
+	return tools.Keyboards{}.NewReplyKeyboardFromSliceOfStringsWithFormation(
+		newButtons,
+		b.maxButtonPerRow,
+		buttonFormation,
+		reverseButtonOrderInRows,
+	)
+}
+
+func (b *ActionBuilder) makeButtonsFromActions(
+	update *StateUpdate,
+	definedConditionsResults map[string]bool,
+	actions []Action,
+) []string {
+	var newButtons []string
+
+	for _, button := range actions {
 		name := button.Name(update)
 
 		shouldBreakAfter := false
@@ -207,10 +241,5 @@ func (b *ActionBuilder) buildButtons(update *StateUpdate, reverseButtonOrderInRo
 		}
 	}
 
-	return tools.Keyboards{}.NewReplyKeyboardFromSliceOfStringsWithFormation(
-		newButtons,
-		b.maxButtonPerRow,
-		buttonFormation,
-		reverseButtonOrderInRows,
-	)
+	return newButtons
 }
