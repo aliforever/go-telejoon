@@ -1,7 +1,8 @@
 package telejoon
 
 type conditionalButtons struct {
-	cond func(update *StateUpdate) bool
+	cond             func(update *StateUpdate) bool
+	cachedCondResult *bool
 
 	buttons []Action
 
@@ -20,8 +21,30 @@ func (b *ActionBuilder) AddConditionalButtons(
 		return b
 	}
 
+	cb := conditionalButtons{
+		buttons:   buttons,
+		formation: buttonFormation,
+	}
+
+	cb.cond = func(update *StateUpdate) bool {
+		if cb.cachedCondResult != nil {
+			return *cb.cachedCondResult
+		}
+
+		condResult := cond(update)
+
+		cb.cachedCondResult = &condResult
+
+		return condResult
+	}
+
 	b.conditionalButtons = append(b.conditionalButtons, conditionalButtons{
-		cond:      cond,
+		cond: func(update *StateUpdate) bool {
+			condResult := cond(update)
+
+			return condResult
+		},
+
 		buttons:   buttons,
 		formation: buttonFormation,
 	})
