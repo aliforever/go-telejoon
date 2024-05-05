@@ -155,7 +155,7 @@ func (b *ActionBuilder) buildButtons(update *StateUpdate, reverseButtonOrderInRo
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	if len(b.buttons) == 0 {
+	if len(b.buttons) == 0 && len(b.conditionalButtons) == 0 {
 		return nil
 	}
 
