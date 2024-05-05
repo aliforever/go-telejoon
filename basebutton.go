@@ -65,20 +65,40 @@ type rawButton struct {
 	baseButton
 }
 
-// AddTextButton adds a textHandler action to the ActionBuilder.
-func (b *ActionBuilder) AddTextButton(button TextBuilder, text TextBuilder, opts ...*ButtonOptions) *ActionBuilder {
-	b.locker.Lock()
-	defer b.locker.Unlock()
-
-	b.buttons = append(b.buttons, textButton{
+func TextButton(button TextBuilder, text TextBuilder, opts ...*ButtonOptions) Action {
+	return textButton{
 		baseButton: baseButton{
 			button:  button,
 			options: opts,
 		},
 		text: text,
-	})
+	}
+}
+
+// AddTextButton adds a textHandler action to the ActionBuilder.
+func (b *ActionBuilder) AddTextButton(button TextBuilder, text TextBuilder, opts ...*ButtonOptions) *ActionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	b.buttons = append(b.buttons, TextButton(button, text, opts...))
 
 	return b
+}
+
+func ConditionalTextButton(
+	cond func(update *StateUpdate) bool,
+	button TextBuilder,
+	text TextBuilder,
+	opts ...*ButtonOptions,
+) Action {
+	return textButton{
+		baseButton: baseButton{
+			button:    button,
+			condition: cond,
+			options:   opts,
+		},
+		text: text,
+	}
 }
 
 // AddConditionalTextButton adds a textHandler action to the ActionBuilder with a condition.
@@ -92,16 +112,25 @@ func (b *ActionBuilder) AddConditionalTextButton(
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, textButton{
-		baseButton: baseButton{
-			button:    button,
-			condition: cond,
-			options:   opts,
-		},
-		text: text,
-	})
+	b.buttons = append(b.buttons, ConditionalTextButton(cond, button, text, opts...))
 
 	return b
+}
+
+func DefinedConditionalTextButton(
+	cond string,
+	button TextBuilder,
+	text TextBuilder,
+	opts ...*ButtonOptions,
+) Action {
+	return textButton{
+		baseButton: baseButton{
+			button:           button,
+			definedCondition: &cond,
+			options:          opts,
+		},
+		text: text,
+	}
 }
 
 // AddDefinedConditionalTextButton adds a textHandler action to the ActionBuilder with a condition name.
@@ -115,16 +144,25 @@ func (b *ActionBuilder) AddDefinedConditionalTextButton(
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, textButton{
-		baseButton: baseButton{
-			button:           button,
-			definedCondition: &cond,
-			options:          opts,
-		},
-		text: text,
-	})
+	b.buttons = append(b.buttons, DefinedConditionalTextButton(cond, button, text, opts...))
 
 	return b
+}
+
+func VsDefinedConditionalTextButton(
+	vsCond string,
+	button TextBuilder,
+	text TextBuilder,
+	opts ...*ButtonOptions,
+) Action {
+	return textButton{
+		baseButton: baseButton{
+			button:                button,
+			definedConditionFalse: &vsCond,
+			options:               opts,
+		},
+		text: text,
+	}
 }
 
 // AddVsDefinedConditionalTextButton adds a textHandler action to the ActionBuilder with a condition name.
@@ -138,16 +176,19 @@ func (b *ActionBuilder) AddVsDefinedConditionalTextButton(
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, textButton{
-		baseButton: baseButton{
-			button:                button,
-			definedConditionFalse: &vsCond,
-			options:               opts,
-		},
-		text: text,
-	})
+	b.buttons = append(b.buttons, VsDefinedConditionalTextButton(vsCond, button, text, opts...))
 
 	return b
+}
+
+func InlineMenuButton(button TextBuilder, inlineMenu string, opts ...*ButtonOptions) Action {
+	return inlineMenuButton{
+		baseButton: baseButton{
+			button:  button,
+			options: opts,
+		},
+		inlineMenu: inlineMenu,
+	}
 }
 
 // AddInlineMenuButton adds an inline menu action to the ActionBuilder.
@@ -160,15 +201,19 @@ func (b *ActionBuilder) AddInlineMenuButton(
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, inlineMenuButton{
+	b.buttons = append(b.buttons, InlineMenuButton(button, inlineMenu, opts...))
+
+	return b
+}
+
+func StateButton(button TextBuilder, state string, opts ...*ButtonOptions) Action {
+	return stateButton{
 		baseButton: baseButton{
 			button:  button,
 			options: opts,
 		},
-		inlineMenu: inlineMenu,
-	})
-
-	return b
+		state: state,
+	}
 }
 
 // AddStateButton adds a state action to the ActionBuilder.
@@ -176,14 +221,20 @@ func (b *ActionBuilder) AddStateButton(button TextBuilder, state string, opts ..
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, stateButton{
+	b.buttons = append(b.buttons, StateButton(button, state, opts...))
+
+	return b
+}
+
+func StateButtonWithHook(button TextBuilder, state string, hook UpdateHandler, opts ...*ButtonOptions) Action {
+	return stateButton{
 		baseButton: baseButton{
 			button:  button,
 			options: opts,
-		}, state: state,
-	})
-
-	return b
+		},
+		state: state,
+		hook:  hook,
+	}
 }
 
 // AddStateButtonWithHook adds a state action to the ActionBuilder with hook.
@@ -197,16 +248,18 @@ func (b *ActionBuilder) AddStateButtonWithHook(
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, stateButton{
+	b.buttons = append(b.buttons, StateButtonWithHook(button, state, hook, opts...))
+
+	return b
+}
+
+func RawButton(button TextBuilder, opts ...*ButtonOptions) Action {
+	return rawButton{
 		baseButton: baseButton{
 			button:  button,
 			options: opts,
 		},
-		state: state,
-		hook:  hook,
-	})
-
-	return b
+	}
 }
 
 // AddRawButton adds a raw button to the ActionBuilder.
@@ -214,14 +267,19 @@ func (b *ActionBuilder) AddRawButton(button TextBuilder, opts ...*ButtonOptions)
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, rawButton{
-		baseButton: baseButton{
-			button:  button,
-			options: opts,
-		},
-	})
+	b.buttons = append(b.buttons, RawButton(button, opts...))
 
 	return b
+}
+
+func ConditionalRawButton(cond func(update *StateUpdate) bool, button TextBuilder, opts ...*ButtonOptions) Action {
+	return rawButton{
+		baseButton: baseButton{
+			button:    button,
+			options:   opts,
+			condition: cond,
+		},
+	}
 }
 
 // AddConditionalRawButton adds a raw button to the ActionBuilder with a condition.
@@ -234,15 +292,19 @@ func (b *ActionBuilder) AddConditionalRawButton(
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, rawButton{
-		baseButton: baseButton{
-			button:    button,
-			options:   opts,
-			condition: cond,
-		},
-	})
+	b.buttons = append(b.buttons, ConditionalRawButton(cond, button, opts...))
 
 	return b
+}
+
+func DefinedConditionalRawButton(cond string, button TextBuilder, opts ...*ButtonOptions) Action {
+	return rawButton{
+		baseButton: baseButton{
+			button:           button,
+			options:          opts,
+			definedCondition: &cond,
+		},
+	}
 }
 
 // AddDefinedConditionalRawButton adds a raw button to the ActionBuilder with a condition name.
@@ -255,15 +317,19 @@ func (b *ActionBuilder) AddDefinedConditionalRawButton(
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, rawButton{
-		baseButton: baseButton{
-			button:           button,
-			options:          opts,
-			definedCondition: &cond,
-		},
-	})
+	b.buttons = append(b.buttons, DefinedConditionalRawButton(cond, button, opts...))
 
 	return b
+}
+
+func VsDefinedConditionalRawButton(cond string, button TextBuilder, opts ...*ButtonOptions) Action {
+	return rawButton{
+		baseButton: baseButton{
+			button:                button,
+			options:               opts,
+			definedConditionFalse: &cond,
+		},
+	}
 }
 
 // AddVsDefinedConditionalRawButton adds a raw button to the ActionBuilder with a condition name.
@@ -276,15 +342,25 @@ func (b *ActionBuilder) AddVsDefinedConditionalRawButton(
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, rawButton{
-		baseButton: baseButton{
-			button:                button,
-			options:               opts,
-			definedConditionFalse: &cond,
-		},
-	})
+	b.buttons = append(b.buttons, VsDefinedConditionalRawButton(cond, button, opts...))
 
 	return b
+}
+
+func ConditionalStateButton(
+	cond func(update *StateUpdate) bool,
+	button TextBuilder,
+	state string,
+	opts ...*ButtonOptions,
+) Action {
+
+	return stateButton{
+		baseButton: baseButton{
+			button:    button,
+			options:   opts,
+			condition: cond,
+		}, state: state,
+	}
 }
 
 // AddConditionalStateButton adds a state button to the ActionBuilder with a condition.
@@ -298,15 +374,25 @@ func (b *ActionBuilder) AddConditionalStateButton(
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, stateButton{
-		baseButton: baseButton{
-			button:    button,
-			options:   opts,
-			condition: cond,
-		}, state: state,
-	})
+	b.buttons = append(b.buttons, ConditionalStateButton(cond, button, state, opts...))
 
 	return b
+}
+
+func DefinedConditionalStateButton(
+	vsCond string,
+	button TextBuilder,
+	state string,
+	opts ...*ButtonOptions,
+) Action {
+
+	return stateButton{
+		baseButton: baseButton{
+			button:           button,
+			options:          opts,
+			definedCondition: &vsCond,
+		}, state: state,
+	}
 }
 
 // AddDefinedConditionalStateButton adds a state button to the ActionBuilder with a condition name.
@@ -320,15 +406,25 @@ func (b *ActionBuilder) AddDefinedConditionalStateButton(
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, stateButton{
-		baseButton: baseButton{
-			button:           button,
-			options:          opts,
-			definedCondition: &vsCond,
-		}, state: state,
-	})
+	b.buttons = append(b.buttons, DefinedConditionalStateButton(vsCond, button, state, opts...))
 
 	return b
+}
+
+func VsDefinedConditionalStateButton(
+	vsCond string,
+	button TextBuilder,
+	state string,
+	opts ...*ButtonOptions,
+) Action {
+
+	return stateButton{
+		baseButton: baseButton{
+			button:                button,
+			options:               opts,
+			definedConditionFalse: &vsCond,
+		}, state: state,
+	}
 }
 
 // AddVsDefinedConditionalStateButton adds a state button to the ActionBuilder with a vs condition name
@@ -342,13 +438,7 @@ func (b *ActionBuilder) AddVsDefinedConditionalStateButton(
 	b.locker.Lock()
 	defer b.locker.Unlock()
 
-	b.buttons = append(b.buttons, stateButton{
-		baseButton: baseButton{
-			button:                button,
-			options:               opts,
-			definedConditionFalse: &vsCond,
-		}, state: state,
-	})
+	b.buttons = append(b.buttons, VsDefinedConditionalStateButton(vsCond, button, state, opts...))
 
 	return b
 }
