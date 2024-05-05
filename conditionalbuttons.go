@@ -38,16 +38,7 @@ func (b *ActionBuilder) AddConditionalButtons(
 		return condResult
 	}
 
-	b.conditionalButtons = append(b.conditionalButtons, conditionalButtons{
-		cond: func(update *StateUpdate) bool {
-			condResult := cond(update)
-
-			return condResult
-		},
-
-		buttons:   buttons,
-		formation: buttonFormation,
-	})
+	b.conditionalButtons = append(b.conditionalButtons, cb)
 
 	return b
 }
