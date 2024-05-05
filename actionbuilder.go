@@ -141,9 +141,19 @@ func (b *ActionBuilder) build(_ *StateUpdate) *ActionBuilder {
 
 // getButtonByButton returns the action by the button.
 func (b *ActionBuilder) getButtonByButton(update *StateUpdate, button string) Action {
-	for _, btn := range b.buttons {
-		if btn.Name(update) == button {
-			return btn
+	for _, availableConditionalButtons := range b.conditionalButtons {
+		if availableConditionalButtons.cond != nil && availableConditionalButtons.cond(update) {
+			for _, action := range availableConditionalButtons.buttons {
+				if action.Name(update) == button {
+					return action
+				}
+			}
+		}
+	}
+
+	for _, action := range b.buttons {
+		if action.Name(update) == button {
+			return action
 		}
 	}
 
