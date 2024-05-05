@@ -30,7 +30,7 @@ func (t baseButton) CanBeShown(update *StateUpdate, definedConditionResults map[
 
 	cond2 := t.condition == nil || t.condition(update)
 
-	return (cond1 && cond1Vs) || cond2
+	return (cond1 && cond1Vs) && cond2
 }
 
 type baseButtonOptions interface {
