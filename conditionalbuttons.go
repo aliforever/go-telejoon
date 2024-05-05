@@ -10,7 +10,7 @@ type conditionalButtons struct {
 
 func (b *ActionBuilder) AddConditionalButtons(
 	cond func(update *StateUpdate) bool,
-	buttons ...baseButton,
+	buttons ...Action,
 ) *ActionBuilder {
 	b.locker.Lock()
 	defer b.locker.Unlock()
@@ -19,15 +19,9 @@ func (b *ActionBuilder) AddConditionalButtons(
 		return b
 	}
 
-	btns := make([]Action, len(buttons))
-
-	for i := range buttons {
-		btns[i] = buttons[i]
-	}
-
 	b.conditionalButtons = append(b.conditionalButtons, conditionalButtons{
 		cond:      cond,
-		buttons:   btns,
+		buttons:   buttons,
 		formation: b.buttonFormation,
 	})
 
