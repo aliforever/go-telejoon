@@ -49,7 +49,8 @@ type conditionalButtonFormation struct {
 type ActionBuilder struct {
 	locker sync.Mutex
 
-	definedConditions map[string]func(update *StateUpdate) bool
+	definedConditions       map[string]func(update *StateUpdate) bool
+	definedConditionResults map[string]bool
 
 	conditionalButtons []conditionalButtons
 	buttons            []Action
@@ -135,25 +136,48 @@ func (b *ActionBuilder) DefineCondition(name string, cond func(update *StateUpda
 	return b
 }
 
-func (b *ActionBuilder) build(_ *StateUpdate) *ActionBuilder {
+// SetConditionValue sets the condition value.
+func (b *ActionBuilder) SetConditionValue(name string, val bool) *ActionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	if b.definedConditionResults == nil {
+		b.definedConditionResults = make(map[string]bool)
+	}
+
+	b.definedConditionResults[name] = val
+
+	return b
+}
+
+func (b *ActionBuilder) build(update *StateUpdate) *ActionBuilder {
+	b.locker.Lock()
+	defer b.locker.Unlock()
+
+	if len(b.definedConditions) > 0 {
+		for name, cond := range b.definedConditions {
+			b.definedConditionResults[name] = cond(update)
+		}
+	}
+
 	return b
 }
 
 // getButtonByButton returns the action by the button.
 func (b *ActionBuilder) getButtonByButton(update *StateUpdate, button string) Action {
-	for _, availableConditionalButtons := range b.conditionalButtons {
-		if availableConditionalButtons.cond != nil && availableConditionalButtons.cond(update) {
-			for _, action := range availableConditionalButtons.buttons {
-				if action.Name(update) == button {
-					return action
-				}
-			}
-		}
+	if action := b.getConditionalButtonByName(update, button); action != nil {
+		return action
 	}
 
 	for _, action := range b.buttons {
 		if action.Name(update) == button {
-			return action
+			if opts, ok := action.(baseButtonOptions); ok {
+				if opts.CanBeShown(update, b.definedConditionResults) {
+					return action
+				}
+			} else {
+				return action
+			}
 		}
 	}
 
@@ -182,21 +206,13 @@ func (b *ActionBuilder) buildButtons(update *StateUpdate, reverseButtonOrderInRo
 		}
 	}
 
-	definedConditionsResults := make(map[string]bool)
-
-	if len(b.definedConditions) > 0 {
-		for name, cond := range b.definedConditions {
-			definedConditionsResults[name] = cond(update)
-		}
-	}
-
 	if len(b.conditionalButtons) > 0 {
 		for _, button := range b.conditionalButtons {
 			if button.cond == nil || !button.cond(update) {
 				continue
 			}
 
-			availableButtons := b.makeButtonsFromActions(update, definedConditionsResults, button.buttons)
+			availableButtons := b.makeButtonsFromActions(update, button.buttons)
 			if len(availableButtons) > 0 {
 				newButtons = append(newButtons, availableButtons...)
 
@@ -207,7 +223,7 @@ func (b *ActionBuilder) buildButtons(update *StateUpdate, reverseButtonOrderInRo
 		}
 	}
 
-	mainButtons := b.makeButtonsFromActions(update, definedConditionsResults, b.buttons)
+	mainButtons := b.makeButtonsFromActions(update, b.buttons)
 
 	newButtons = append(newButtons, mainButtons...)
 	buttonFormation = append(buttonFormation, b.buttonFormation...)
@@ -222,7 +238,6 @@ func (b *ActionBuilder) buildButtons(update *StateUpdate, reverseButtonOrderInRo
 
 func (b *ActionBuilder) makeButtonsFromActions(
 	update *StateUpdate,
-	definedConditionsResults map[string]bool,
 	actions []Action,
 ) []string {
 	var newButtons []string
@@ -233,7 +248,7 @@ func (b *ActionBuilder) makeButtonsFromActions(
 		shouldBreakAfter := false
 
 		if opts, ok := button.(baseButtonOptions); ok {
-			if !opts.CanBeShown(update, definedConditionsResults) {
+			if !opts.CanBeShown(update, b.definedConditionResults) {
 				continue
 			}
 

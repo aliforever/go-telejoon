@@ -5,7 +5,7 @@ type baseButton struct {
 
 	definedCondition *string
 
-	definedConditionFalse *string
+	vsDefinedCondition *string
 
 	condition func(update *StateUpdate) bool
 
@@ -26,7 +26,7 @@ func (t baseButton) Options() *ButtonOptions {
 
 func (t baseButton) CanBeShown(update *StateUpdate, definedConditionResults map[string]bool) bool {
 	cond1 := t.definedCondition == nil || definedConditionResults[*t.definedCondition]
-	cond1Vs := t.definedConditionFalse == nil || !definedConditionResults[*t.definedConditionFalse]
+	cond1Vs := t.vsDefinedCondition == nil || !definedConditionResults[*t.vsDefinedCondition]
 
 	cond2 := t.condition == nil || t.condition(update)
 
@@ -157,9 +157,9 @@ func VsDefinedConditionalTextButton(
 ) Action {
 	return textButton{
 		baseButton: baseButton{
-			button:                button,
-			definedConditionFalse: &vsCond,
-			options:               opts,
+			button:             button,
+			vsDefinedCondition: &vsCond,
+			options:            opts,
 		},
 		text: text,
 	}
@@ -325,9 +325,9 @@ func (b *ActionBuilder) AddDefinedConditionalRawButton(
 func VsDefinedConditionalRawButton(cond string, button TextBuilder, opts ...*ButtonOptions) Action {
 	return rawButton{
 		baseButton: baseButton{
-			button:                button,
-			options:               opts,
-			definedConditionFalse: &cond,
+			button:             button,
+			options:            opts,
+			vsDefinedCondition: &cond,
 		},
 	}
 }
@@ -420,9 +420,9 @@ func VsDefinedConditionalStateButton(
 
 	return stateButton{
 		baseButton: baseButton{
-			button:                button,
-			options:               opts,
-			definedConditionFalse: &vsCond,
+			button:             button,
+			options:            opts,
+			vsDefinedCondition: &vsCond,
 		}, state: state,
 	}
 }

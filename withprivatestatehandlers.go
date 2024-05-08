@@ -395,7 +395,10 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 			buttonText := update.Update.Message.Text
 
 			if actionBuilder != nil {
-				if buttonAction := actionBuilder.getButtonByButton(update, buttonText); buttonAction != nil {
+				if buttonAction := actionBuilder.getButtonByButton(
+					update,
+					buttonText,
+				); buttonAction != nil {
 					var err error
 
 					shouldStop := true
