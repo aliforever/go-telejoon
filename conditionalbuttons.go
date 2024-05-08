@@ -11,9 +11,15 @@ type conditionalButtons struct {
 }
 
 func (b *conditionalButtons) canBeShown(update *StateUpdate, conditionResults map[string]bool) bool {
-	return (b.cond == nil || b.cond(update)) &&
-		(len(conditionResults) == 0 || conditionResults[*b.definedCondition]) &&
-		(len(conditionResults) == 0 || !conditionResults[*b.vsDefinedCondition])
+	cond1 := b.cond == nil || b.cond(update)
+
+	cond2, cond3 := true, true
+	if len(conditionResults) > 0 {
+		cond2 = b.definedCondition == nil || conditionResults[*b.definedCondition]
+		cond3 = b.vsDefinedCondition == nil || !conditionResults[*b.vsDefinedCondition]
+	}
+
+	return cond1 && cond2 && cond3
 }
 
 func (b *ActionBuilder) AddConditionalButtons(
