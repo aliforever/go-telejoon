@@ -207,17 +207,15 @@ func (b *ActionBuilder) buildButtons(update *StateUpdate, reverseButtonOrderInRo
 	}
 
 	if len(b.conditionalButtons) > 0 {
-		for _, button := range b.conditionalButtons {
-			if button.cond == nil || !button.cond(update) {
-				continue
-			}
+		for _, cdbs := range b.conditionalButtons {
+			if cdbs.canBeShown(update, b.definedConditionResults) {
+				availableButtons := b.makeButtonsFromActions(update, cdbs.buttons)
+				if len(availableButtons) > 0 {
+					newButtons = append(newButtons, availableButtons...)
 
-			availableButtons := b.makeButtonsFromActions(update, button.buttons)
-			if len(availableButtons) > 0 {
-				newButtons = append(newButtons, availableButtons...)
-
-				if len(button.formation) > 0 {
-					buttonFormation = append(buttonFormation, button.formation...)
+					if len(cdbs.formation) > 0 {
+						buttonFormation = append(buttonFormation, cdbs.formation...)
+					}
 				}
 			}
 		}

@@ -10,6 +10,12 @@ type conditionalButtons struct {
 	formation []int
 }
 
+func (b *conditionalButtons) canBeShown(update *StateUpdate, conditionResults map[string]bool) bool {
+	return (b.cond == nil || b.cond(update)) &&
+		(len(conditionResults) == 0 || conditionResults[*b.definedCondition]) &&
+		(len(conditionResults) == 0 || !conditionResults[*b.vsDefinedCondition])
+}
+
 func (b *ActionBuilder) AddConditionalButtons(
 	cond func(update *StateUpdate) bool,
 	buttonFormation []int,
@@ -86,12 +92,7 @@ func (b *ActionBuilder) getConditionalButtonByName(
 	}
 
 	for _, acb := range b.conditionalButtons {
-		condition1 := len(b.definedConditionResults) == 0 ||
-			(acb.definedCondition != nil && b.definedConditionResults[*acb.definedCondition])
-
-		condition2 := acb.cond != nil && acb.cond(update)
-
-		if condition1 && condition2 {
+		if acb.canBeShown(update, b.definedConditionResults) {
 			for _, action := range acb.buttons {
 				if action.Name(update) == name {
 					if opts, ok := action.(baseButtonOptions); ok {
