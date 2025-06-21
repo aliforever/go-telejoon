@@ -942,5 +942,5 @@ func (g *Generator) replaceBotName(tpl string) string {
 }
 
 func (g *Generator) replaceNetworkName(tpl string) string {
-	return strings.ReplaceAll(tpl, "{{NETWORK}}", g.botName)
+	return strings.ReplaceAll(tpl, "{{Network}}", g.botName)
 }
