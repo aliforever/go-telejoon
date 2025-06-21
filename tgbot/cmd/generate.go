@@ -664,12 +664,14 @@ func (g *Generator) templateDbRepositoryUsers() string {
 	tpl := `package db
 
 import (
+    "sync"
+
 	"github.com/aliforever/go-mongolio"
-	"{{MODULE_PATH}}/lib/bot/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"sync"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+
+    "{{MODULE_PATH}}/lib/bot/models"
 )
 
 type Users interface {
@@ -700,7 +702,7 @@ func (m *mongoUsers) Upsert(user *models.User) error {
 		"firstname": user.Firstname,
 		"lastname":  user.Lastname,
 		"username":  user.Username,
-	}, options.Update().SetUpsert(true))
+	}, options.UpdateOne().SetUpsert(true))
 
 	return err
 }`
