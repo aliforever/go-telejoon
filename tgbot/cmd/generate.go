@@ -310,18 +310,20 @@ func (g *Generator) templateMain() string {
 
 import (
 	"context"
+	"log/slog"
+	"os"
+
 	"github.com/aliforever/go-telegram-bot-api"
 	"github.com/aliforever/go-telejoon"
+	"github.com/caarlos0/env/v8"
+	"github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"golang.org/x/text/language"
+
 	"{{MODULE_PATH}}/lib/bot"
 	"{{MODULE_PATH}}/lib/bot/config"
 	"{{MODULE_PATH}}/lib/bot/db"
-	"github.com/caarlos0/env/v8"
-	"github.com/redis/go-redis/v9"
-	"github.com/sirupsen/logrus"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"golang.org/x/text/language"
-	"time"
 )
 
 func main() {
@@ -331,23 +333,39 @@ func main() {
 		panic(err)
 	}
 
-	logger := logrus.New()
-	logger.SetLevel(logrus.Level(cfg.LogLevel))
+	logHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.Level(cfg.LogLevel),
+	})
 
-	logger.Infof("Running bot with config: %+v", cfg)
+	logger := slog.New(logHandler)
+
+	logger.Info(
+		"Running bot",
+		slog.Any("cfg", cfg),
+	)
 
 	botAPI, err := tgbotapi.New(cfg.BotToken)
 	if err != nil {
-		logger.Panic(err)
+		logger.Error(
+			"Failed to create bot",
+			slog.Any("error", err),
+		)
+
+		return
 	}
 
 	if cfg.LogGroupID != 0 {
-		logger.AddHook(botAPI.LogrusPeriodicLogger(cfg.LogGroupID, time.Minute*1, "bot"))
+		logger = slog.New(botAPI.SlogHandler(logHandler, cfg.LogGroupID))
 	}
 
-	mongoClient, err := mongo.Connect(context.Background(), options.Client().ApplyURI(cfg.Mongo.Uri))
+	mongoClient, err := mongo.Connect(options.Client().ApplyURI(cfg.Mongo.Uri))
 	if err != nil {
-		logger.Panic(err)
+		logger.Error(
+			"Failed to connect to mongo",
+			slog.Any("error", err),
+		)
+
+		return
 	}
 
 	redisClient := redis.NewClient(&redis.Options{
@@ -358,7 +376,12 @@ func main() {
 
 	_, err = redisClient.Ping(context.Background()).Result()
 	if err != nil {
-		logger.Panic(err)
+		logger.Error(
+			"Failed to connect to redis",
+			slog.Any("error", err),
+		)
+
+		return
 	}
 
 	repo := db.NewRepository(mongoClient.Database(cfg.Mongo.Name), redisClient)
@@ -369,12 +392,23 @@ func main() {
 			"locale.fa.toml",
 		}).Build()
 	if err != nil {
-		logger.Panic(err)
+		logger.Error(
+			"Failed to build languages",
+			slog.Any("error", err),
+		)
+
+		return
 	}
 
 	go bot.NewBot(botAPI, repo, languages, cfg.LogGroupID, logger).Start()
 
-	logger.Panic(botAPI.GetUpdates().LongPoll())
+	pollErr := botAPI.GetUpdates().LongPoll()
+	if pollErr != nil {
+		logger.Error(
+			"Failed to poll for updates",
+			slog.Any("error", pollErr),
+		)
+	}
 }`
 
 	return g.replaceModulePath(tpl)
@@ -448,9 +482,10 @@ func (g *Generator) templateDbRepository() string {
 
 import (
 	"github.com/aliforever/go-telegram-bot-api/structs"
-	"{{MODULE_PATH}}/lib/bot/models"
 	"github.com/redis/go-redis/v9"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+
+	"{{MODULE_PATH}}/lib/bot/models"
 )
 
 type Repository struct {
@@ -531,11 +566,14 @@ func (g *Generator) templateDbRepositoryUserLanguage() string {
 	tpl := `package db
 
 import (
+	"sync"
+
 	"github.com/aliforever/go-mongolio"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+
 	"{{MODULE_PATH}}/lib/bot/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type UserLanguage interface {
@@ -565,7 +603,7 @@ func (m mongoUserLanguage) Insert(user *models.UserLanguage) error {
 func (m mongoUserLanguage) Upsert(user *models.UserLanguage) error {
 	_, err := m.model.UpdateByID(user.ID, bson.M{
 		"tag": user.Tag,
-	}, options.Update().SetUpsert(true))
+	}, options.UpdateOne().SetUpsert(true))
 
 	return err
 }`
@@ -579,10 +617,11 @@ func (g *Generator) templateDbRepositoryUserState() string {
 
 import (
 	"github.com/aliforever/go-mongolio"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+
 	"{{MODULE_PATH}}/lib/bot/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type UserState interface {
@@ -612,7 +651,7 @@ func (m mongoUserState) Insert(user *models.UserState) error {
 func (m mongoUserState) Upsert(user *models.UserState) error {
 	_, err := m.model.UpdateByID(user.ID, bson.M{
 		"state": user.State,
-	}, options.Update().SetUpsert(true))
+	}, options.UpdateOne().SetUpsert(true))
 
 	return err
 }`
@@ -718,10 +757,12 @@ func (g *Generator) templateBot() string {
 	tpl := `package bot
 
 import (
+	"log/slog"
+
 	"github.com/aliforever/go-telegram-bot-api"
 	"github.com/aliforever/go-telejoon"
+
 	"{{MODULE_PATH}}/lib/bot/db"
-	"github.com/sirupsen/logrus"
 )
 
 type Bot struct {
@@ -729,7 +770,7 @@ type Bot struct {
 	repository     *db.Repository
 	languageConfig *telejoon.LanguageConfig
 	logGroupID     int64
-	logger         *logrus.Logger
+	logger         *slog.Logger
 }
 
 func NewBot(
@@ -737,7 +778,7 @@ func NewBot(
 	repository *db.Repository,
 	languages *telejoon.Languages,
 	logGroupID int64,
-	logger *logrus.Logger,
+	logger *slog.Logger,
 ) *Bot {
 	languageConfig := telejoon.NewLanguageConfig(languages, repository).
 		WithChangeLanguageMenu("ChooseLanguage", true)
@@ -764,14 +805,14 @@ func (b *Bot) NewProcessor() *telejoon.EngineWithPrivateStateHandlers {
 		options...,
 	).WithLanguageConfig(b.languageConfig)
 
-	processor.AddStaticMenu("Welcome", b.Welcome())
+    processor.AddStaticMenu("Welcome", b.Welcome())
 
 	return processor
 }
 
 func (b *Bot) Start() {
 	for update := range b.api.Updates() {
-		b.NewProcessor().Process(b.api, update)
+		go b.NewProcessor().Process(b.api, update)
 	}
 }
 `
