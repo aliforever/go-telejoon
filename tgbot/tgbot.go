@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+
 	"github.com/aliforever/go-telejoon/tgbot/cmd"
 )
 
@@ -44,7 +45,7 @@ func main() {
 	fmt.Println("2. Print Deferred Text Function tgbot -dt")
 	fmt.Println("3. Print Deferred Action Handler Function tgbot -dah")
 
-	fmt.Println("Enter number: ")
+	fmt.Println("Enter Choice: ")
 
 	var choice int
 

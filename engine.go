@@ -3,8 +3,9 @@ package telejoon
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/aliforever/go-telegram-bot-api"
 	"log"
+
+	"github.com/aliforever/go-telegram-bot-api"
 )
 
 type engine struct {

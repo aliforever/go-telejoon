@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/aliforever/go-telegram-bot-api"
 	"io"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/aliforever/go-telegram-bot-api"
 )
 
 type Generator struct {
@@ -104,6 +105,16 @@ func (g *Generator) Generate() error {
 	}
 
 	err = g.createWelcome()
+	if err != nil {
+		return err
+	}
+
+	err = g.createDockerCompose()
+	if err != nil {
+		return err
+	}
+
+	err = g.createDocker()
 	if err != nil {
 		return err
 	}
@@ -283,6 +294,14 @@ func (g *Generator) createBot() error {
 
 func (g *Generator) createWelcome() error {
 	return os.WriteFile("lib/bot/welcome.go", []byte(g.templateWelcome()), os.ModePerm)
+}
+
+func (g *Generator) createDockerCompose() error {
+	return os.WriteFile("docker-compose.yml", []byte(g.templateDockerCompose()), os.ModePerm)
+}
+
+func (g *Generator) createDocker() error {
+	return os.WriteFile("Dockerfile", []byte(g.templateDocker()), os.ModePerm)
 }
 
 // templateMain is the template for cmd/bot/main.go file
@@ -780,10 +799,107 @@ func (b *Bot) Welcome() *telejoon.StaticMenu {
 	return tpl
 }
 
+// templateDockerCompose is the template for docker-compose file
+func (g *Generator) templateDockerCompose() string {
+	tpl := `version: '3.8'
+
+services:
+  bot:
+    build: .
+    container_name: bot
+    depends_on:
+      - mongo
+      - redis
+    networks:
+      - {{Network}}
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - {{Network}}
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - {{Network}}
+    restart: unless-stopped
+
+networks:
+  {{Network}}:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  redis_data:`
+
+	return g.replaceNetworkName(tpl)
+}
+
+// templateDocker is the template for Dockerfile
+func (g *Generator) templateDocker() string {
+	tpl := `# Stage 1: Build
+FROM golang:alpine AS builder
+
+# Install git for fetching dependencies
+RUN apk add --no-cache git
+
+# Set working directory inside the container
+WORKDIR /app
+
+# Copy go mod files and download dependencies
+COPY go.mod ./
+COPY locale.*.toml ./
+RUN go mod download
+
+# Copy the rest of the application
+COPY . .
+
+# Build the Go app
+RUN go build -o bot ./cmd/bot
+
+# Stage 2: Run
+FROM alpine:latest
+
+# Add certificates
+RUN apk --no-cache add ca-certificates
+
+# Set working directory
+WORKDIR /app
+
+# Copy binary and locales from builder
+COPY --from=builder /app/bot .
+COPY --from=builder /app/locale.*.toml ./
+
+# Expose port if needed (optional)
+# EXPOSE 8080
+
+# Run the binary
+CMD ["./bot"]
+`
+
+	return tpl
+}
+
 func (g *Generator) replaceModulePath(tpl string) string {
 	return strings.ReplaceAll(tpl, "{{MODULE_PATH}}", g.ModulePath)
 }
 
 func (g *Generator) replaceBotName(tpl string) string {
 	return strings.ReplaceAll(tpl, "{{BOT_NAME}}", g.botName)
+}
+
+func (g *Generator) replaceNetworkName(tpl string) string {
+	return strings.ReplaceAll(tpl, "{{NETWORK}}", g.botName)
 }
