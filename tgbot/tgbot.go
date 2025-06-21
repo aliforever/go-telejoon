@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/aliforever/go-telejoon/tgbot/cmd"
 )
@@ -64,11 +68,25 @@ func main() {
 			return
 		}
 
-		fmt.Println("Enter module path: ")
-		_, err = fmt.Scanln(&modulePath)
+		// Get current working directory name as default module path
+		cwd, err := os.Getwd()
+		if err != nil {
+			fmt.Printf("Error getting current directory: %v\n", err)
+			return
+		}
+		defaultModulePath := filepath.Base(cwd)
+
+		fmt.Printf("Enter module path [%s]: ", defaultModulePath)
+		reader := bufio.NewReader(os.Stdin)
+		modulePath, err = reader.ReadString('\n')
 		if err != nil {
 			fmt.Println(err)
 			return
+		}
+		// Trim whitespace and use default if input is empty
+		modulePath = strings.TrimSpace(modulePath)
+		if modulePath == "" {
+			modulePath = defaultModulePath
 		}
 
 		err = cmd.NewGenerator(token, modulePath).Generate()
