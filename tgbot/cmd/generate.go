@@ -566,8 +566,6 @@ func (g *Generator) templateDbRepositoryUserLanguage() string {
 	tpl := `package db
 
 import (
-	"sync"
-
 	"github.com/aliforever/go-mongolio"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
