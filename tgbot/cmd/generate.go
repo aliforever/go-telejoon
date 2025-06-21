@@ -459,12 +459,12 @@ type Config struct {
 }
 
 type Mongo struct {
-	Uri  string ____env:"URI" envDefault:"mongodb://localhost:27017"____
+	Uri  string ____env:"URI" envDefault:"mongodb://mongo:27017"____
 	Name string ____env:"NAME" envDefault:"{{BOT_NAME}}"____
 }
 
 type Redis struct {
-	Address  string ____env:"ADDRESS" envDefault:"localhost:6379"____
+	Address  string ____env:"ADDRESS" envDefault:"redis:6379"____
 	Password string ____env:"PASSWORD"____
 	DB       int    ____env:"DB" envDefault:"0"____
 }
