@@ -17,17 +17,19 @@ func main() {
 		modulePath string
 		dt         bool
 		dah        bool
+		local      bool
 	)
 
 	flag.StringVar(&token, "token", "", "Bot token")
 	flag.StringVar(&modulePath, "module_path", "", "Module Path")
 	flag.BoolVar(&dt, "dt", false, "Print Deferred Text Function")
 	flag.BoolVar(&dah, "dah", false, "Print Deferred Action Handler Function")
+	flag.BoolVar(&local, "local", false, "Run in local development mode (forward ports, use localhost)")
 
 	flag.Parse()
 
 	if token != "" && modulePath != "" {
-		err := cmd.NewGenerator(token, modulePath).Generate()
+		err := cmd.NewGenerator(token, modulePath, local).Generate()
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -89,7 +91,7 @@ func main() {
 			modulePath = defaultModulePath
 		}
 
-		err = cmd.NewGenerator(token, modulePath).Generate()
+		err = cmd.NewGenerator(token, modulePath, local).Generate()
 		if err != nil {
 			fmt.Println(err)
 			return

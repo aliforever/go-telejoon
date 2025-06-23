@@ -1,5 +1,12 @@
 package telejoon
 
+type ShouldPass bool
+
+const (
+	Pass  ShouldPass = false
+	Block ShouldPass = true
+)
+
 type SwitchAction interface {
 	target() string
 }

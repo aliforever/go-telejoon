@@ -53,7 +53,9 @@ func WithPrivateStateHandlers(
 
 // AddStaticMenu adds a static state Handler
 func (e *EngineWithPrivateStateHandlers) AddStaticMenu(
-	state string, handler *StaticMenu) *EngineWithPrivateStateHandlers {
+	state string,
+	handler *StaticMenu,
+) *EngineWithPrivateStateHandlers {
 
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -76,7 +78,8 @@ func (e *EngineWithPrivateStateHandlers) WithPanicHandler(
 }
 
 func (e *EngineWithPrivateStateHandlers) AddMiddleware(
-	middleware UpdateHandler) *EngineWithPrivateStateHandlers {
+	middleware UpdateHandler,
+) *EngineWithPrivateStateHandlers {
 
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -88,7 +91,9 @@ func (e *EngineWithPrivateStateHandlers) AddMiddleware(
 
 // AddInlineMenu adds an inline state Handler
 func (e *EngineWithPrivateStateHandlers) AddInlineMenu(
-	name string, handler *InlineMenu) *EngineWithPrivateStateHandlers {
+	name string,
+	handler *InlineMenu,
+) *EngineWithPrivateStateHandlers {
 
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -101,9 +106,7 @@ func (e *EngineWithPrivateStateHandlers) AddInlineMenu(
 }
 
 // WithLanguageConfig adds a language config to the engine
-func (e *EngineWithPrivateStateHandlers) WithLanguageConfig(
-	cfg *LanguageConfig) *EngineWithPrivateStateHandlers {
-
+func (e *EngineWithPrivateStateHandlers) WithLanguageConfig(cfg *LanguageConfig) *EngineWithPrivateStateHandlers {
 	e.languageConfig = cfg
 
 	if cfg.changeLanguageState == "" {
@@ -139,7 +142,9 @@ func (e *EngineWithPrivateStateHandlers) WithLanguageConfig(
 	})
 
 	deferredDynamicTextBuilder := NewDynamicHandlerText(func(
-		client *tgbotapi.TelegramBot, update *StateUpdate) (SwitchAction, bool) {
+		client *tgbotapi.TelegramBot,
+		update *StateUpdate,
+	) (SwitchAction, ShouldPass) {
 
 		for i := range cfg.languages.localizers {
 			lang := cfg.languages.localizers[i]

@@ -14,13 +14,15 @@ type Generator struct {
 	BotToken   string
 	ModulePath string
 	botName    string
+	localDev   bool
 }
 
 // NewGenerator creates a new Generator
-func NewGenerator(botToken, modulePath string) *Generator {
+func NewGenerator(botToken, modulePath string, localDev bool) *Generator {
 	return &Generator{
 		BotToken:   botToken,
 		ModulePath: modulePath,
+		localDev:   localDev,
 	}
 }
 
@@ -448,32 +450,37 @@ ChangeLanguageButton = "🇺🇸 Switch Language"`
 
 // templateConfig is the template for lib/bot/config/config.go file
 func (g *Generator) templateConfig() string {
+	// Set MongoDB and Redis addresses based on local dev mode
+	mongoURI := "mongodb://mongo:27017"
+	redisAddr := "redis:6379"
+
+	if g.localDev {
+		mongoURI = "mongodb://localhost:27017"
+		redisAddr = "localhost:6379"
+	}
+
 	tpl := `package config
 
 type Config struct {
-	BotToken   string ____env:"BOT_TOKEN" envDefault:"{{BOT_TOKEN}}"____
-	LogGroupID int64  ____env:"LOG_GROUP_ID"____
-	LogLevel   int    ____env:"LOG_LEVEL" envDefault:"6"____
-	Mongo      Mongo  ____envPrefix:"MONGO_"____
-	Redis      Redis  ____envPrefix:"REDIS_"____
+	BotToken   string ` + "`" + `env:"BOT_TOKEN" envDefault:"` + g.BotToken + `"` + "`" + `
+	LogGroupID int64  ` + "`" + `env:"LOG_GROUP_ID"` + "`" + `
+	LogLevel   int    ` + "`" + `env:"LOG_LEVEL" envDefault:"6"` + "`" + `
+	Mongo      Mongo  ` + "`" + `envPrefix:"MONGO_"` + "`" + `
+	Redis      Redis  ` + "`" + `envPrefix:"REDIS_"` + "`" + `
 }
 
 type Mongo struct {
-	Uri  string ____env:"URI" envDefault:"mongodb://mongo:27017"____
-	Name string ____env:"NAME" envDefault:"{{BOT_NAME}}"____
+	Uri  string ` + "`" + `env:"URI" envDefault:"` + mongoURI + `"` + "`" + `
+	Name string ` + "`" + `env:"NAME" envDefault:"` + g.botName + `"` + "`" + `
 }
 
 type Redis struct {
-	Address  string ____env:"ADDRESS" envDefault:"redis:6379"____
-	Password string ____env:"PASSWORD"____
-	DB       int    ____env:"DB" envDefault:"0"____
-}
-`
+	Address  string ` + "`" + `env:"ADDRESS" envDefault:"` + redisAddr + `"` + "`" + `
+	Password string ` + "`" + `env:"PASSWORD"` + "`" + `
+	DB       int    ` + "`" + `env:"DB" envDefault:"0"` + "`" + `
+}`
 
-	tpl = strings.ReplaceAll(tpl, "____", "`")
-	tpl = strings.ReplaceAll(tpl, "{{BOT_TOKEN}}", g.BotToken)
-
-	return g.replaceBotName(tpl)
+	return tpl
 }
 
 // templateDbRepository is the template for lib/bot/db/repository.go file
@@ -842,9 +849,14 @@ func (b *Bot) Welcome() *telejoon.StaticMenu {
 
 // templateDockerCompose is the template for docker-compose file
 func (g *Generator) templateDockerCompose() string {
+	// Generate the base template
 	tpl := `version: '3.8'
 
-services:
+services:`
+
+	// Only include the bot service in non-local mode
+	if !g.localDev {
+		tpl += `
   bot:
     build: .
     container_name: bot
@@ -853,13 +865,23 @@ services:
       - redis
     networks:
       - {{Network}}
-    restart: unless-stopped
+    restart: unless-stopped`
+	}
 
+	// Add MongoDB service
+	tpl += `
   mongo:
     image: mongo:7
-    container_name: mongo
+    container_name: mongo`
+
+	// Add MongoDB port forwarding if in local development mode
+	if g.localDev {
+		tpl += `
     ports:
-      - "27017:27017"
+      - "27017:27017"`
+	}
+
+	tpl += `
     volumes:
       - mongo_data:/data/db
     networks:
@@ -868,9 +890,16 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: redis
+    container_name: redis`
+
+	// Add Redis port forwarding if in local development mode
+	if g.localDev {
+		tpl += `
     ports:
-      - "6379:6379"
+      - "6379:6379"`
+	}
+
+	tpl += `
     volumes:
       - redis_data:/data
     networks:
