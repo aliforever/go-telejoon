@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/aliforever/go-telegram-bot-api"
+	"os"
+	"testing"
+
+	tgbotapi "github.com/aliforever/go-telegram-bot-api"
 	"github.com/aliforever/go-telegram-bot-api/structs"
 	"github.com/aliforever/go-telejoon"
 	"golang.org/x/text/language"
-	"os"
-	"testing"
 )
 
 type ExampleUser struct {
@@ -84,7 +85,7 @@ func TestStart(t *testing.T) {
 						WithPanicHandler(func(client *tgbotapi.TelegramBot, update tgbotapi.Update, err any, stack string) {
 							fmt.Println("Panic Handler", update, "\n", stack)
 						}).
-						AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate) (telejoon.SwitchAction, bool) {
+						AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate) (telejoon.SwitchAction, telejoon.ShouldPass) {
 							if update.Update.Message.Text == "panic" {
 								panic("Panic Test")
 							}
@@ -98,7 +99,7 @@ func TestStart(t *testing.T) {
 									AddTextButton(telejoon.NewStaticText("Hello"), telejoon.NewStaticText("You said Hello")).
 									AddStateButton(telejoon.NewStaticText("Info State"), "Info").
 									AddInlineMenuButton(telejoon.NewStaticText("Info"), "Info"),
-								telejoon.NewDynamicHandlerText(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate) (telejoon.SwitchAction, bool) {
+								telejoon.NewDynamicHandlerText(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate) (telejoon.SwitchAction, telejoon.ShouldPass) {
 									if update.Update.Message.Text == "Hello Bro" {
 										client.Send(client.Message().SetChatId(update.Update.From().Id).
 											SetText("Hello Bro!"))
@@ -112,7 +113,7 @@ func TestStart(t *testing.T) {
 
 									return nil, true
 								}),
-								telejoon.NewMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate) (telejoon.SwitchAction, bool) {
+								telejoon.NewMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate) (telejoon.SwitchAction, telejoon.ShouldPass) {
 									update.Set("name", "Ali")
 
 									return nil, true
@@ -141,7 +142,7 @@ func TestStart(t *testing.T) {
 									AddInlineMenuButtonWithEdit(telejoon.NewStaticText("CustomInline"), telejoon.NewStaticText("CustomInline"), "CustomInline").
 									AddInlineMenuButtonWithEdit(telejoon.NewStaticText("Back"), telejoon.NewStaticText("Info"), "Info"))).
 						AddInlineMenu("CustomInline", CustomInlineMenu()).
-						AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate) (telejoon.SwitchAction, bool) {
+						AddMiddleware(func(client *tgbotapi.TelegramBot, update *telejoon.StateUpdate) (telejoon.SwitchAction, telejoon.ShouldPass) {
 							fmt.Println("update inside middleware", update)
 
 							if update.Update.Message != nil {

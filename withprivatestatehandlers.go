@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/aliforever/go-telegram-bot-api"
+	tgbotapi "github.com/aliforever/go-telegram-bot-api"
 	"github.com/aliforever/go-telegram-bot-api/structs"
 )
 
@@ -17,7 +17,7 @@ type EngineWithPrivateStateHandlers struct {
 
 	userRepository UserRepository
 
-	m sync.Mutex
+	m sync.RWMutex
 
 	panicHandler PanicHandler
 
@@ -256,7 +256,7 @@ func (e *EngineWithPrivateStateHandlers) Process(client *tgbotapi.TelegramBot, u
 	}
 
 	if update.Message != nil {
-		if handler := e.staticMenus[userState]; handler != nil {
+		if handler := e.getStaticMenu(userState); handler != nil {
 			e.processStaticHandler(from.Id, handler, client, su)
 			return
 		}
@@ -314,14 +314,29 @@ func (e *EngineWithPrivateStateHandlers) SendInlineMenu(
 func (e *EngineWithPrivateStateHandlers) getCallbackQueryHandler(
 	data string) func(*tgbotapi.TelegramBot, *StateUpdate, ...string) (SwitchAction, error) {
 
-	e.m.Lock()
-	defer e.m.Unlock()
+	e.m.RLock()
+	defer e.m.RUnlock()
 
 	if handler, ok := e.callbackQueryHandlers[data]; ok {
 		return handler
 	}
 
 	return nil
+}
+
+// getStaticMenu returns a static menu by state name (thread-safe)
+func (e *EngineWithPrivateStateHandlers) getStaticMenu(state string) *StaticMenu {
+	e.m.RLock()
+	defer e.m.RUnlock()
+	return e.staticMenus[state]
+}
+
+// getInlineMenu returns an inline menu by name (thread-safe)
+func (e *EngineWithPrivateStateHandlers) getInlineMenu(name string) (*InlineMenu, bool) {
+	e.m.RLock()
+	defer e.m.RUnlock()
+	menu, ok := e.inlineMenus[name]
+	return menu, ok
 }
 
 func (e *EngineWithPrivateStateHandlers) canProcess(update tgbotapi.Update) bool {
@@ -345,7 +360,7 @@ func (e *EngineWithPrivateStateHandlers) processCallbackQuery(
 
 	menu := data[0]
 
-	if inlineMenu, ok := e.inlineMenus[menu]; !ok {
+	if inlineMenu, ok := e.getInlineMenu(menu); !ok {
 		if callbackHandler := e.getCallbackQueryHandler(data[0]); callbackHandler != nil {
 			switchAction, err := callbackHandler(client, update, data[1:]...)
 			if err != nil {
@@ -439,7 +454,6 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 						shouldStop = false
 						// do nothing for raw action, as it is only used to act like a button and may be handled in a
 						// dynamic Handler
-						break
 					default:
 						err = fmt.Errorf("unknown_action_kind: %+v", buttonAction)
 					}
@@ -541,7 +555,7 @@ func (e *EngineWithPrivateStateHandlers) processStaticHandler(
 func (e *EngineWithPrivateStateHandlers) processInlineHandler(
 	menuName string, client *tgbotapi.TelegramBot, update *StateUpdate, edit bool) error {
 
-	menu, ok := e.inlineMenus[menuName]
+	menu, ok := e.getInlineMenu(menuName)
 	if !ok {
 		return fmt.Errorf("inline_menu_not_found: %s", menuName)
 	}
@@ -566,10 +580,9 @@ func (e *EngineWithPrivateStateHandlers) processInlineHandler(
 		return fmt.Errorf("inline_menu_action_builder_not_set: %s", menuName)
 	}
 
-	markup := actionBuilder.buildButtons(
-		update,
-		update.Language().rtl && e.languageConfig != nil && e.languageConfig.reverseButtonOrderInRowForRTL,
-	)
+	lang := update.Language()
+	reverseOrder := lang != nil && lang.rtl && e.languageConfig != nil && e.languageConfig.reverseButtonOrderInRowForRTL
+	markup := actionBuilder.buildButtons(update, reverseOrder)
 
 	replyText := menu.processTextBuilder(update)
 	if replyText == "" {
@@ -579,6 +592,9 @@ func (e *EngineWithPrivateStateHandlers) processInlineHandler(
 	var cfg tgbotapi.Config
 
 	if edit {
+		if update.Update.CallbackQuery == nil || update.Update.CallbackQuery.Message == nil {
+			return fmt.Errorf("cannot edit message: callback query or message is nil")
+		}
 		cfg = client.EditMessageText().SetText(replyText).
 			SetChatId(from.Id).
 			SetMessageId(update.Update.CallbackQuery.Message.MessageId).
@@ -601,7 +617,7 @@ func (e *EngineWithPrivateStateHandlers) processInlineHandler(
 func (e *EngineWithPrivateStateHandlers) switchState(
 	userID int64, nextState string, client *tgbotapi.TelegramBot, stateUpdate *StateUpdate) error {
 
-	if handler := e.staticMenus[nextState]; handler != nil {
+	if handler := e.getStaticMenu(nextState); handler != nil {
 		if err := e.userRepository.SetUserState(userID, nextState); err != nil {
 			return fmt.Errorf("error_setting_user_state: %d, %w", userID, err)
 		}
