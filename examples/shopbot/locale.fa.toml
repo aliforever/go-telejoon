@@ -1,0 +1,52 @@
+[ChooseLanguage]
+Text = "🇮🇷 زبان خود را انتخاب کنید"
+Button = "🇮🇷 فارسی"
+
+[Welcome]
+Main = "به فروشگاه نمونه خوش آمدید، {{.Name}}! یک گزینه را انتخاب کنید:"
+Products = "🛍 محصولات"
+Support = "🆘 پشتیبانی"
+Profile = "👤 پروفایل"
+Admin = "🛠 مدیریت"
+Help = "ℹ️ راهنما"
+HelpBody = "این بات همه قابلیت‌های telejoon v3 را نمایش می‌دهد."
+
+[Products]
+Title = "محصولات ما:"
+Added = "به سبد اضافه شد"
+OutOfStock = "متأسفانه موجود نیست"
+
+[Checkout]
+Text = "تسویه حساب محصول #{{.ProductID}} (تعداد {{.Qty}}). آدرس تحویل را ارسال کنید."
+Done = "سفارش ثبت شد! متشکریم."
+
+[Support]
+Text = "هر چیزی بفرستید: متن، عکس، سند، موقعیت مکانی یا مخاطب."
+GotText = "پشتیبانی پیام شما را دریافت کرد: %s"
+GotPhoto = "عکس قشنگی بود (%d اندازه دریافت شد)"
+GotDocument = "سند %s دریافت شد"
+GotLocation = "موقعیت مکانی دریافت شد: %.4f، %.4f"
+GotContact = "مخاطب %s دریافت شد"
+GotOther = "متشکرم، دریافت شد."
+
+[Profile]
+Text = "پروفایل شما"
+LoggedIn = "شما با نام %s وارد شده‌اید"
+LoggedOut = "شما وارد نشده‌اید"
+
+[Admin]
+Text = "پنل مدیریت"
+Denied = "فقط مدیران."
+Broadcast = "📣 پیام همگانی"
+BroadcastPrompt = "متن پیام همگانی را بفرستید."
+BroadcastDone = "پیام برای %d کاربر ارسال می‌شد (نمایشی)."
+
+[General]
+Back = "⬅️ بازگشت"
+Login = "🔑 ورود"
+Logout = "🚪 خروج"
+Refresh = "🔄 تازه‌سازی"
+Details = "🔎 جزئیات"
+Buy = "💰 خرید"
+Crash = "💥 خطا"
+CrashText = "بوم"

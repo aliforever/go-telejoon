@@ -1,6 +1,8 @@
 package telejoon
 
 import (
+	"fmt"
+
 	"github.com/BurntSushi/toml"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"golang.org/x/text/language"
@@ -50,6 +52,10 @@ type Language struct {
 
 // Get returns the localized string for the given message ID.
 func (l *Language) Get(id string) (string, error) {
+	if l == nil || l.localizer == nil {
+		return "", fmt.Errorf("language_not_available: %s", id)
+	}
+
 	return l.localizer.Localize(&i18n.LocalizeConfig{
 		MessageID: id,
 	})
@@ -58,6 +64,10 @@ func (l *Language) Get(id string) (string, error) {
 // MustGet returns the localized string for the given message ID.
 // If the message ID is not found, it will panic.
 func (l *Language) MustGet(id string) string {
+	if l == nil || l.localizer == nil {
+		return ""
+	}
+
 	return l.localizer.MustLocalize(&i18n.LocalizeConfig{
 		MessageID: id,
 	})
@@ -65,6 +75,10 @@ func (l *Language) MustGet(id string) string {
 
 // GetWithParams returns the localized string for the given message ID and parameters.
 func (l *Language) GetWithParams(id string, params map[string]interface{}) (string, error) {
+	if l == nil || l.localizer == nil {
+		return "", fmt.Errorf("language_not_available: %s", id)
+	}
+
 	return l.localizer.Localize(&i18n.LocalizeConfig{
 		MessageID:    id,
 		TemplateData: params,
@@ -73,6 +87,10 @@ func (l *Language) GetWithParams(id string, params map[string]interface{}) (stri
 
 // MustGetWithParams returns the localized string for the given message ID and parameters.
 func (l *Language) MustGetWithParams(id string, params map[string]interface{}) string {
+	if l == nil || l.localizer == nil {
+		return ""
+	}
+
 	return l.localizer.MustLocalize(&i18n.LocalizeConfig{
 		MessageID:    id,
 		TemplateData: params,
@@ -96,6 +114,7 @@ func (l *Languages) GetByTag(tag string) *Language {
 }
 
 type LanguagesBuilder struct {
+	defaultTag       language.Tag
 	defaultBundle    *i18n.Bundle
 	rtlLanguageTags  []language.Tag
 	unmarshalFuncs   map[string]i18n.UnmarshalFunc
@@ -104,6 +123,7 @@ type LanguagesBuilder struct {
 
 func NewLanguageBuilder(defaultBundle language.Tag, rtlLanguageTags ...language.Tag) *LanguagesBuilder {
 	return &LanguagesBuilder{
+		defaultTag:      defaultBundle,
 		defaultBundle:   i18n.NewBundle(defaultBundle),
 		rtlLanguageTags: rtlLanguageTags,
 	}
@@ -136,10 +156,17 @@ func (lb *LanguagesBuilder) Build() (*Languages, error) {
 				}
 			}
 
+			// Fall back to the bundle's default language for keys missing
+			// in this language, instead of erroring (and panicking via MustGet).
+			localizerTags := []string{msgFile.Tag.String()}
+			if defaultTag := lb.defaultTag.String(); defaultTag != msgFile.Tag.String() {
+				localizerTags = append(localizerTags, defaultTag)
+			}
+
 			localizers = append(localizers, Language{
 				tag:       msgFile.Tag.String(),
 				rtl:       isRtl,
-				localizer: i18n.NewLocalizer(lb.defaultBundle, msgFile.Tag.String()),
+				localizer: i18n.NewLocalizer(lb.defaultBundle, localizerTags...),
 			})
 		}
 	}

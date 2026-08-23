@@ -1,0 +1,52 @@
+[ChooseLanguage]
+Text = "🇺🇸 Choose your language"
+Button = "🇺🇸 English"
+
+[Welcome]
+Main = "Welcome to the Example Shop, {{.Name}}! Pick an option:"
+Products = "🛍 Products"
+Support = "🆘 Support"
+Profile = "👤 Profile"
+Admin = "🛠 Admin"
+Help = "ℹ️ Help"
+HelpBody = "This bot demonstrates every telejoon v3 feature. Everything runs against in-memory data."
+
+[Products]
+Title = "Our products:"
+Added = "Added to cart"
+OutOfStock = "Sorry, out of stock"
+
+[Checkout]
+Text = "Checking out product #{{.ProductID}} (qty {{.Qty}}). Send me your delivery address."
+Done = "Order placed! Thanks."
+
+[Support]
+Text = "Send me anything: text, a photo, a document, a location or a contact."
+GotText = "Support received your message: %s"
+GotPhoto = "Nice photo (%d sizes received)"
+GotDocument = "Document %s received"
+GotLocation = "Location received: %.4f, %.4f"
+GotContact = "Contact %s received"
+GotOther = "Thanks, I got it."
+
+[Profile]
+Text = "Your profile"
+LoggedIn = "You are logged in as %s"
+LoggedOut = "You are not logged in"
+
+[Admin]
+Text = "Admin panel"
+Denied = "Admins only."
+Broadcast = "📣 Broadcast"
+BroadcastPrompt = "Send me the broadcast text."
+BroadcastDone = "Broadcast would be sent to %d users (demo, not sent)."
+
+[General]
+Back = "⬅️ Back"
+Login = "🔑 Log in"
+Logout = "🚪 Log out"
+Refresh = "🔄 Refresh"
+Details = "🔎 Details"
+Buy = "💰 Buy"
+Crash = "💥 Crash"
+CrashText = "boom"

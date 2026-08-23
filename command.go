@@ -32,6 +32,10 @@ func ParseCommand(text string) *Command {
 		cmdPart = cmdPart[:idx]
 	}
 
+	if cmdPart == "" {
+		return nil
+	}
+
 	cmd := &Command{
 		Name:    cmdPart,
 		BotName: botName,

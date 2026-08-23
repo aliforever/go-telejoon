@@ -31,9 +31,10 @@ func main() {
 	if token != "" && modulePath != "" {
 		err := cmd.NewGenerator(token, modulePath, local).Generate()
 		if err != nil {
-			fmt.Println(err)
-			return
+			fatal(err)
 		}
+
+		return
 	}
 
 	if dt {
@@ -57,8 +58,7 @@ func main() {
 
 	_, err := fmt.Scanln(&choice)
 	if err != nil {
-		fmt.Println(err)
-		return
+		fatal(err)
 	}
 
 	switch choice {
@@ -66,15 +66,13 @@ func main() {
 		fmt.Println("Enter token: ")
 		_, err = fmt.Scanln(&token)
 		if err != nil {
-			fmt.Println(err)
-			return
+			fatal(err)
 		}
 
 		// Get current working directory name as default module path
 		cwd, err := os.Getwd()
 		if err != nil {
-			fmt.Printf("Error getting current directory: %v\n", err)
-			return
+			fatal(fmt.Errorf("error getting current directory: %w", err))
 		}
 		defaultModulePath := filepath.Base(cwd)
 
@@ -82,8 +80,7 @@ func main() {
 		reader := bufio.NewReader(os.Stdin)
 		modulePath, err = reader.ReadString('\n')
 		if err != nil {
-			fmt.Println(err)
-			return
+			fatal(err)
 		}
 		// Trim whitespace and use default if input is empty
 		modulePath = strings.TrimSpace(modulePath)
@@ -93,8 +90,7 @@ func main() {
 
 		err = cmd.NewGenerator(token, modulePath, local).Generate()
 		if err != nil {
-			fmt.Println(err)
-			return
+			fatal(err)
 		}
 	case 2:
 		cmd.NewPrinter().PrintDeferredTextFunction()
@@ -103,4 +99,9 @@ func main() {
 	default:
 		fmt.Println("Invalid choice")
 	}
+}
+
+func fatal(err error) {
+	fmt.Fprintln(os.Stderr, err)
+	os.Exit(1)
 }

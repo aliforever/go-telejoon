@@ -10,20 +10,18 @@ func NewPrinter() *Printer {
 	return &Printer{}
 }
 
-// PrintDeferredTextFunction is a function type that is used to print deferred text function.
+// PrintDeferredTextFunction prints a sample deferred text function.
 func (p *Printer) PrintDeferredTextFunction() {
-	fn := `func (b *Bot) DeferredText(update *telejoon.StateUpdate) string {
+	fn := `func (b *Bot) DeferredText(ctx *telejoon.Ctx) string {
 	return "deferred text"
 }`
 	fmt.Println(fn)
 }
 
+// PrintDeferredActionHandlerFunction prints a sample menu text handler.
 func (p *Printer) PrintDeferredActionHandlerFunction() {
-	fn := `func (b *Bot) DeferredActionHandler(
-	client *tgbotapi.TelegramBot,
-	update *telejoon.StateUpdate,
-) (telejoon.SwitchAction, bool) {
-	return telejoon.NewSwitchActionState("Welcome"), true
+	fn := `func (b *Bot) WelcomeTextHandler(ctx *telejoon.Ctx, data *telejoon.NoData, text string) telejoon.Action {
+	return ctx.GoTo(stateWelcome)
 }`
 
 	fmt.Println(fn)

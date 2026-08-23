@@ -1,6 +1,7 @@
 package telejoon
 
 import (
+	"fmt"
 	"runtime/debug"
 	"sync"
 
@@ -24,7 +25,7 @@ type EngineWithGroupHandlers struct {
 // NewGroupHandlers creates a new group handler engine
 func NewGroupHandlers(opts ...*Options) *EngineWithGroupHandlers {
 	return &EngineWithGroupHandlers{
-		engine: engine{opts: opts},
+		engine: newEngine(opts...),
 	}
 }
 
@@ -65,13 +66,17 @@ func (e *EngineWithGroupHandlers) canProcess(update tgbotapi.Update) bool {
 }
 
 func (e *EngineWithGroupHandlers) Process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
-	if e.panicHandler != nil {
-		defer func() {
-			if r := recover(); r != nil {
+	// Always recover: each update runs in its own goroutine, so an
+	// unrecovered panic would take down the whole process.
+	defer func() {
+		if r := recover(); r != nil {
+			if e.panicHandler != nil {
 				e.panicHandler(client, update, r, string(debug.Stack()))
+			} else {
+				e.onErr(client, update, fmt.Errorf("panic: %v\n%s", r, debug.Stack()))
 			}
-		}()
-	}
+		}
+	}()
 
 	e.m.RLock()
 	middlewares := e.middlewares
@@ -110,7 +115,7 @@ type EngineWithChannelHandlers struct {
 // NewChannelHandlers creates a new channel handler engine
 func NewChannelHandlers(opts ...*Options) *EngineWithChannelHandlers {
 	return &EngineWithChannelHandlers{
-		engine: engine{opts: opts},
+		engine: newEngine(opts...),
 	}
 }
 
@@ -155,13 +160,17 @@ func (e *EngineWithChannelHandlers) canProcess(update tgbotapi.Update) bool {
 }
 
 func (e *EngineWithChannelHandlers) Process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
-	if e.panicHandler != nil {
-		defer func() {
-			if r := recover(); r != nil {
+	// Always recover: each update runs in its own goroutine, so an
+	// unrecovered panic would take down the whole process.
+	defer func() {
+		if r := recover(); r != nil {
+			if e.panicHandler != nil {
 				e.panicHandler(client, update, r, string(debug.Stack()))
+			} else {
+				e.onErr(client, update, fmt.Errorf("panic: %v\n%s", r, debug.Stack()))
 			}
-		}()
-	}
+		}
+	}()
 
 	e.m.RLock()
 	middlewares := e.middlewares

@@ -67,7 +67,7 @@ func (m *MockUserRepository) GetUserState(id int64) (string, error) {
 	if state, ok := m.states.Load(id); ok {
 		return state.(string), nil
 	}
-	return "", nil
+	return "", UserStateNotFoundErr
 }
 
 // SetState pre-sets a state for testing purposes (doesn't track the call)
@@ -96,8 +96,17 @@ func (m *MockUserRepository) Reset() {
 	m.UpsertUserCalls = nil
 	m.SetStateCalls = nil
 	m.GetStateCalls = nil
-	m.users = sync.Map{}
-	m.states = sync.Map{}
+
+	// Clear in place instead of replacing the maps: SetState/SetUser/GetUser
+	// access them without m.mu, so swapping in a new sync.Map would race.
+	m.users.Range(func(key, _ interface{}) bool {
+		m.users.Delete(key)
+		return true
+	})
+	m.states.Range(func(key, _ interface{}) bool {
+		m.states.Delete(key)
+		return true
+	})
 }
 
 // AssertUpsertUserCalled returns true if UpsertUser was called for the given user ID
@@ -168,7 +177,7 @@ func (m *MockUserLanguageRepository) GetUserLanguage(id int64) (string, error) {
 	if lang, ok := m.languages.Load(id); ok {
 		return lang.(string), nil
 	}
-	return "", nil
+	return "", UserLanguageNotFoundErr
 }
 
 // SetLanguage pre-sets a language for testing
@@ -183,5 +192,10 @@ func (m *MockUserLanguageRepository) Reset() {
 
 	m.SetLanguageCalls = nil
 	m.GetLanguageCalls = nil
-	m.languages = sync.Map{}
+
+	// Clear in place instead of replacing the map (see MockUserRepository.Reset).
+	m.languages.Range(func(key, _ interface{}) bool {
+		m.languages.Delete(key)
+		return true
+	})
 }

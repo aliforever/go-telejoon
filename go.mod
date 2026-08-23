@@ -1,6 +1,6 @@
 module github.com/aliforever/go-telejoon
 
-go 1.21
+go 1.27
 
 require (
 	github.com/BurntSushi/toml v1.2.1

@@ -102,11 +102,26 @@ func (b *TestUpdateBuilder) WithUser(id int64, firstName, username string) *Test
 	return b
 }
 
+// ensureMessage creates a minimal valid message if none exists, so updates
+// built only with media helpers are accepted by the engine (non-nil Chat/From).
+func (b *TestUpdateBuilder) ensureMessage() {
+	if b.update.Message == nil {
+		b.update.Message = &structs.Message{
+			MessageId: 1,
+			Chat: &structs.Chat{
+				Id:   1,
+				Type: "private",
+			},
+			From: &structs.User{
+				Id: 1,
+			},
+		}
+	}
+}
+
 // WithPhoto adds a photo to the message
 func (b *TestUpdateBuilder) WithPhoto(fileID string) *TestUpdateBuilder {
-	if b.update.Message == nil {
-		b.update.Message = &structs.Message{}
-	}
+	b.ensureMessage()
 	b.update.Message.Photo = []structs.PhotoSize{
 		{FileId: fileID, Width: 100, Height: 100},
 	}
@@ -115,9 +130,7 @@ func (b *TestUpdateBuilder) WithPhoto(fileID string) *TestUpdateBuilder {
 
 // WithDocument adds a document to the message
 func (b *TestUpdateBuilder) WithDocument(fileID, fileName string) *TestUpdateBuilder {
-	if b.update.Message == nil {
-		b.update.Message = &structs.Message{}
-	}
+	b.ensureMessage()
 	b.update.Message.Document = &structs.Document{
 		FileId:   fileID,
 		FileName: fileName,
@@ -127,9 +140,7 @@ func (b *TestUpdateBuilder) WithDocument(fileID, fileName string) *TestUpdateBui
 
 // WithLocation adds a location to the message
 func (b *TestUpdateBuilder) WithLocation(latitude, longitude float64) *TestUpdateBuilder {
-	if b.update.Message == nil {
-		b.update.Message = &structs.Message{}
-	}
+	b.ensureMessage()
 	b.update.Message.Location = &structs.Location{
 		Latitude:  latitude,
 		Longitude: longitude,
@@ -139,9 +150,7 @@ func (b *TestUpdateBuilder) WithLocation(latitude, longitude float64) *TestUpdat
 
 // WithContact adds a contact to the message
 func (b *TestUpdateBuilder) WithContact(phoneNumber, firstName string) *TestUpdateBuilder {
-	if b.update.Message == nil {
-		b.update.Message = &structs.Message{}
-	}
+	b.ensureMessage()
 	b.update.Message.Contact = &structs.Contact{
 		PhoneNumber: phoneNumber,
 		FirstName:   firstName,
@@ -173,19 +182,19 @@ func (b *TestUpdateBuilder) Build() tgbotapi.Update {
 	return b.update
 }
 
-// BuildStateUpdate returns a StateUpdate wrapping the constructed update
-func (b *TestUpdateBuilder) BuildStateUpdate(state string) *StateUpdate {
-	return &StateUpdate{
-		storage: &sync.Map{},
+// BuildCtx returns a Ctx wrapping the constructed update.
+func (b *TestUpdateBuilder) BuildCtx(state string) *Ctx {
+	return &Ctx{
+		session: &sync.Map{},
 		State:   state,
 		Update:  b.update,
 	}
 }
 
-// BuildStateUpdateWithLanguage returns a StateUpdate with language set
-func (b *TestUpdateBuilder) BuildStateUpdateWithLanguage(state string, lang *Language) *StateUpdate {
-	return &StateUpdate{
-		storage:  &sync.Map{},
+// BuildCtxWithLanguage returns a Ctx with language set.
+func (b *TestUpdateBuilder) BuildCtxWithLanguage(state string, lang *Language) *Ctx {
+	return &Ctx{
+		session:  &sync.Map{},
 		State:    state,
 		Update:   b.update,
 		language: lang,

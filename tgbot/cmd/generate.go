@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -27,6 +26,14 @@ func NewGenerator(botToken, modulePath string, localDev bool) *Generator {
 }
 
 func (g *Generator) Generate() error {
+	if g.ModulePath == "" || strings.ContainsAny(g.ModulePath, " \t\r\n") {
+		return fmt.Errorf("invalid module path %q: must be non-empty and contain no whitespace", g.ModulePath)
+	}
+
+	if err := g.checkTargetsAbsent(); err != nil {
+		return err
+	}
+
 	bot, err := tgbotapi.New(g.BotToken)
 	if err != nil {
 		return err
@@ -121,6 +128,11 @@ func (g *Generator) Generate() error {
 		return err
 	}
 
+	err = g.createGitignore()
+	if err != nil {
+		return err
+	}
+
 	err = g.goModInit()
 	if err != nil {
 		return err
@@ -145,18 +157,50 @@ func (g *Generator) Generate() error {
 	return nil
 }
 
+// checkTargetsAbsent returns an error listing the files that Generate would
+// write if any of them already exist in the current directory.
+func (g *Generator) checkTargetsAbsent() error {
+	targets := []string{
+		"go.mod",
+		".gitignore",
+		"cmd/bot/main.go",
+		"locale.fa.toml",
+		"locale.en.toml",
+		"lib/bot/config/config.go",
+		"lib/bot/db/repository.go",
+		"lib/bot/db/userlanguage.go",
+		"lib/bot/db/userstate.go",
+		"lib/bot/db/users.go",
+		"lib/bot/models/user.go",
+		"lib/bot/models/userlanguage.go",
+		"lib/bot/models/userstate.go",
+		"lib/bot/bot.go",
+		"lib/bot/welcome.go",
+		"docker-compose.yml",
+		"Dockerfile",
+	}
+
+	var existing []string
+
+	for _, target := range targets {
+		if _, err := os.Stat(target); err == nil {
+			existing = append(existing, target)
+		}
+	}
+
+	if len(existing) > 0 {
+		return fmt.Errorf("refusing to overwrite existing files: %s", strings.Join(existing, ", "))
+	}
+
+	return nil
+}
+
 func (g *Generator) goModInit() error {
 	cmd := exec.Command("go", "mod", "init", g.ModulePath)
 
-	errPipe, err := cmd.StderrPipe()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return err
-	}
-
-	err = cmd.Run()
-	if err != nil {
-		b, _ := io.ReadAll(errPipe)
-		return fmt.Errorf("go mod init failed: %s => %s", err, string(b))
+		return fmt.Errorf("go mod init failed: %s => %s", err, string(out))
 	}
 
 	return nil
@@ -165,15 +209,9 @@ func (g *Generator) goModInit() error {
 func (g *Generator) goModTidy() error {
 	cmd := exec.Command("go", "mod", "tidy")
 
-	errPipe, err := cmd.StderrPipe()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return err
-	}
-
-	err = cmd.Run()
-	if err != nil {
-		b, _ := io.ReadAll(errPipe)
-		return fmt.Errorf("go mod tidy failed: %s => %s", err, string(b))
+		return fmt.Errorf("go mod tidy failed: %s => %s", err, string(out))
 	}
 
 	return nil
@@ -182,15 +220,9 @@ func (g *Generator) goModTidy() error {
 func (g *Generator) goFmt() error {
 	cmd := exec.Command("go", "fmt", "./...")
 
-	errPipe, err := cmd.StderrPipe()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return err
-	}
-
-	err = cmd.Run()
-	if err != nil {
-		b, _ := io.ReadAll(errPipe)
-		return fmt.Errorf("go fmt failed: %s => %s", err, string(b))
+		return fmt.Errorf("go fmt failed: %s => %s", err, string(out))
 	}
 
 	return nil
@@ -199,38 +231,32 @@ func (g *Generator) goFmt() error {
 func (g *Generator) goSortImports() error {
 	cmd := exec.Command("goimports", "-w", ".")
 
-	errPipe, err := cmd.StderrPipe()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return err
-	}
-
-	err = cmd.Run()
-	if err != nil {
-		b, _ := io.ReadAll(errPipe)
-		fmt.Println(string(b))
-		return fmt.Errorf("goimports failed: %s => %s", err, string(b))
+		fmt.Println(string(out))
+		return fmt.Errorf("goimports failed: %s => %s", err, string(out))
 	}
 
 	return nil
 }
 
 func (g *Generator) createDirectories() error {
-	err := os.MkdirAll("cmd/bot", os.ModePerm)
+	err := os.MkdirAll("cmd/bot", 0755)
 	if err != nil {
 		return err
 	}
 
-	err = os.MkdirAll("lib/bot/config", os.ModePerm)
+	err = os.MkdirAll("lib/bot/config", 0755)
 	if err != nil {
 		return err
 	}
 
-	err = os.MkdirAll("lib/bot/db", os.ModePerm)
+	err = os.MkdirAll("lib/bot/db", 0755)
 	if err != nil {
 		return err
 	}
 
-	err = os.MkdirAll("lib/bot/models", os.ModePerm)
+	err = os.MkdirAll("lib/bot/models", 0755)
 	if err != nil {
 		return err
 	}
@@ -239,30 +265,30 @@ func (g *Generator) createDirectories() error {
 }
 
 func (g *Generator) createMain() error {
-	return os.WriteFile("cmd/bot/main.go", []byte(g.templateMain()), os.ModePerm)
+	return os.WriteFile("cmd/bot/main.go", []byte(g.templateMain()), 0644)
 }
 
 func (g *Generator) createLangFa() error {
-	return os.WriteFile("locale.fa.toml", []byte(g.templateLangFa()), os.ModePerm)
+	return os.WriteFile("locale.fa.toml", []byte(g.templateLangFa()), 0644)
 }
 
 func (g *Generator) createLangEn() error {
-	return os.WriteFile("locale.en.toml", []byte(g.templateLangEn()), os.ModePerm)
+	return os.WriteFile("locale.en.toml", []byte(g.templateLangEn()), 0644)
 }
 
 func (g *Generator) createConfig() error {
-	return os.WriteFile("lib/bot/config/config.go", []byte(g.templateConfig()), os.ModePerm)
+	return os.WriteFile("lib/bot/config/config.go", []byte(g.templateConfig()), 0644)
 }
 
 func (g *Generator) createDbRepository() error {
-	return os.WriteFile("lib/bot/db/repository.go", []byte(g.templateDbRepository()), os.ModePerm)
+	return os.WriteFile("lib/bot/db/repository.go", []byte(g.templateDbRepository()), 0644)
 }
 
 func (g *Generator) createDbRepositoryUserLanguage() error {
 	return os.WriteFile(
 		"lib/bot/db/userlanguage.go",
 		[]byte(g.templateDbRepositoryUserLanguage()),
-		os.ModePerm,
+		0644,
 	)
 }
 
@@ -270,40 +296,44 @@ func (g *Generator) createDbRepositoryUserState() error {
 	return os.WriteFile(
 		"lib/bot/db/userstate.go",
 		[]byte(g.templateDbRepositoryUserState()),
-		os.ModePerm,
+		0644,
 	)
 }
 
 func (g *Generator) createDbRepositoryUsers() error {
-	return os.WriteFile("lib/bot/db/users.go", []byte(g.templateDbRepositoryUsers()), os.ModePerm)
+	return os.WriteFile("lib/bot/db/users.go", []byte(g.templateDbRepositoryUsers()), 0644)
 }
 
 func (g *Generator) createModelsUser() error {
-	return os.WriteFile("lib/bot/models/user.go", []byte(g.templateModelsUser()), os.ModePerm)
+	return os.WriteFile("lib/bot/models/user.go", []byte(g.templateModelsUser()), 0644)
 }
 
 func (g *Generator) createModelsUserLanguage() error {
-	return os.WriteFile("lib/bot/models/userlanguage.go", []byte(g.templateModelsUserLanguage()), os.ModePerm)
+	return os.WriteFile("lib/bot/models/userlanguage.go", []byte(g.templateModelsUserLanguage()), 0644)
 }
 
 func (g *Generator) createModelsUserState() error {
-	return os.WriteFile("lib/bot/models/userstate.go", []byte(g.templateModelsUserState()), os.ModePerm)
+	return os.WriteFile("lib/bot/models/userstate.go", []byte(g.templateModelsUserState()), 0644)
 }
 
 func (g *Generator) createBot() error {
-	return os.WriteFile("lib/bot/bot.go", []byte(g.templateBot()), os.ModePerm)
+	return os.WriteFile("lib/bot/bot.go", []byte(g.templateBot()), 0644)
 }
 
 func (g *Generator) createWelcome() error {
-	return os.WriteFile("lib/bot/welcome.go", []byte(g.templateWelcome()), os.ModePerm)
+	return os.WriteFile("lib/bot/welcome.go", []byte(g.templateWelcome()), 0644)
 }
 
 func (g *Generator) createDockerCompose() error {
-	return os.WriteFile("docker-compose.yml", []byte(g.templateDockerCompose()), os.ModePerm)
+	return os.WriteFile("docker-compose.yml", []byte(g.templateDockerCompose()), 0644)
 }
 
 func (g *Generator) createDocker() error {
-	return os.WriteFile("Dockerfile", []byte(g.templateDocker()), os.ModePerm)
+	return os.WriteFile("Dockerfile", []byte(g.templateDocker()), 0644)
+}
+
+func (g *Generator) createGitignore() error {
+	return os.WriteFile(".gitignore", []byte(g.templateGitignore()), 0644)
 }
 
 // templateMain is the template for cmd/bot/main.go file
@@ -343,7 +373,10 @@ func main() {
 
 	logger.Info(
 		"Running bot",
-		slog.Any("cfg", cfg),
+		slog.Int64("logGroupID", cfg.LogGroupID),
+		slog.String("mongoURI", cfg.Mongo.Uri),
+		slog.String("mongoName", cfg.Mongo.Name),
+		slog.String("redisAddress", cfg.Redis.Address),
 	)
 
 	botAPI, err := tgbotapi.New(cfg.BotToken)
@@ -462,7 +495,7 @@ func (g *Generator) templateConfig() string {
 	tpl := `package config
 
 type Config struct {
-	BotToken   string ` + "`" + `env:"BOT_TOKEN" envDefault:"` + g.BotToken + `"` + "`" + `
+	BotToken   string ` + "`" + `env:"BOT_TOKEN"` + "`" + `
 	LogGroupID int64  ` + "`" + `env:"LOG_GROUP_ID"` + "`" + `
 	LogLevel   int    ` + "`" + `env:"LOG_LEVEL" envDefault:"6"` + "`" + `
 	Mongo      Mongo  ` + "`" + `envPrefix:"MONGO_"` + "`" + `
@@ -488,7 +521,10 @@ func (g *Generator) templateDbRepository() string {
 	tpl := `package db
 
 import (
+	"errors"
+
 	"github.com/aliforever/go-telegram-bot-api/structs"
+	"github.com/aliforever/go-telejoon"
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
@@ -541,6 +577,10 @@ func (r *Repository) SetUserState(id int64, state string) error {
 func (r *Repository) GetUserState(id int64) (string, error) {
 	us, err := r.UserState.FindByID(id)
 	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return "", telejoon.UserStateNotFoundErr
+		}
+
 		return "", err
 	}
 
@@ -548,17 +588,19 @@ func (r *Repository) GetUserState(id int64) (string, error) {
 }
 
 func (r *Repository) SetUserLanguage(userID int64, languageTag string) error {
-	_ = r.UserLanguage.Upsert(&models.UserLanguage{
+	return r.UserLanguage.Upsert(&models.UserLanguage{
 		ID:  userID,
 		Tag: languageTag,
 	})
-
-	return nil
 }
 
 func (r *Repository) GetUserLanguage(userID int64) (string, error) {
 	ul, err := r.UserLanguage.FindByID(userID)
 	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return "", telejoon.UserLanguageNotFoundErr
+		}
+
 		return "", err
 	}
 
@@ -606,7 +648,7 @@ func (m mongoUserLanguage) Insert(user *models.UserLanguage) error {
 }
 
 func (m mongoUserLanguage) Upsert(user *models.UserLanguage) error {
-	_, err := m.model.UpdateByID(user.ID, bson.M{
+	_, err := m.model.UpdateByIDWithMap(user.ID, bson.M{
 		"tag": user.Tag,
 	}, options.UpdateOne().SetUpsert(true))
 
@@ -654,7 +696,7 @@ func (m mongoUserState) Insert(user *models.UserState) error {
 }
 
 func (m mongoUserState) Upsert(user *models.UserState) error {
-	_, err := m.model.UpdateByID(user.ID, bson.M{
+	_, err := m.model.UpdateByIDWithMap(user.ID, bson.M{
 		"state": user.State,
 	}, options.UpdateOne().SetUpsert(true))
 
@@ -703,7 +745,7 @@ func (m *mongoUsers) FindById(id int64) (*models.User, error) {
 }
 
 func (m *mongoUsers) Upsert(user *models.User) error {
-	_, err := m.model.UpdateByID(user.ID, bson.M{
+	_, err := m.model.UpdateByIDWithMap(user.ID, bson.M{
 		"firstname": user.Firstname,
 		"lastname":  user.Lastname,
 		"username":  user.Username,
@@ -799,27 +841,31 @@ func NewBot(
 	}
 }
 
-func (b *Bot) NewProcessor() *telejoon.EngineWithPrivateStateHandlers {
+func (b *Bot) NewEngine() *telejoon.Engine {
 	var options []*telejoon.Options
 
 	if b.logGroupID != 0 {
 		options = append(options, telejoon.NewOptions().SetErrorGroupID(b.logGroupID))
 	}
 
-	processor := telejoon.WithPrivateStateHandlers(
+	engine := telejoon.New(
 		b.repository,
-		"Welcome",
+		stateWelcome,
 		options...,
 	).WithLanguageConfig(b.languageConfig)
 
-    processor.AddStaticMenu("Welcome", b.Welcome())
+	engine.Add(b.Welcome())
 
-	return processor
+	if err := engine.Validate(); err != nil {
+		panic(err)
+	}
+
+	return engine
 }
 
 func (b *Bot) Start() {
 	for update := range b.api.Updates() {
-		go b.NewProcessor().Process(b.api, update)
+		go b.NewEngine().Process(b.api, update)
 	}
 }
 `
@@ -835,13 +881,18 @@ import (
 	"github.com/aliforever/go-telejoon"
 )
 
-func (b *Bot) Welcome() *telejoon.StaticMenu {
-	actionHandlers := telejoon.NewStaticActionBuilder().
-		AddStateButton(telejoon.NewLanguageKeyText("Welcome.ChangeLanguageButton"), "ChooseLanguage").
-		SetButtonFormation(1).
-		SetMaxButtonPerRow(2)
+var (
+	stateWelcome        = telejoon.NewState[telejoon.NoData]("Welcome")
+	stateChooseLanguage = telejoon.NewState[telejoon.NoData]("ChooseLanguage")
+)
 
-	return telejoon.NewStaticMenu(telejoon.NewLanguageKeyText("Welcome.Main"), actionHandlers)
+func (b *Bot) Welcome() *telejoon.MenuBuilder[telejoon.NoData] {
+	return telejoon.Menu(stateWelcome, telejoon.L("Welcome.Main")).
+		Buttons(
+			telejoon.GoTo(telejoon.L("Welcome.ChangeLanguageButton"), stateChooseLanguage),
+		).
+		Formation(1).
+		MaxPerRow(2)
 }`
 
 	return tpl
@@ -850,9 +901,7 @@ func (b *Bot) Welcome() *telejoon.StaticMenu {
 // templateDockerCompose is the template for docker-compose file
 func (g *Generator) templateDockerCompose() string {
 	// Generate the base template
-	tpl := `version: '3.8'
-
-services:`
+	tpl := `services:`
 
 	// Only include the bot service in non-local mode
 	if !g.localDev {
@@ -863,6 +912,8 @@ services:`
     depends_on:
       - mongo
       - redis
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
     networks:
       - {{Network}}
     restart: unless-stopped`
@@ -929,7 +980,7 @@ RUN apk add --no-cache git
 WORKDIR /app
 
 # Copy go mod files and download dependencies
-COPY go.mod ./
+COPY go.mod go.sum ./
 COPY locale.*.toml ./
 RUN go mod download
 
@@ -957,6 +1008,31 @@ COPY --from=builder /app/locale.*.toml ./
 
 # Run the binary
 CMD ["./bot"]
+`
+
+	return tpl
+}
+
+// templateGitignore is the template for the .gitignore file
+func (g *Generator) templateGitignore() string {
+	tpl := `# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with go test -c
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Compiled bot binary
+bot
+
+# Environment variables (contains BOT_TOKEN)
+.env
 `
 
 	return tpl
