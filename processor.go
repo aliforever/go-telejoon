@@ -1,8 +1,12 @@
 package telejoon
 
-import "github.com/aliforever/go-telegram-bot-api"
+import (
+	"context"
+
+	tgbotapi "github.com/aliforever/go-telegram-bot-api/v2"
+)
 
 type Processor interface {
 	canProcess(update tgbotapi.Update) bool
-	Process(client *tgbotapi.TelegramBot, update tgbotapi.Update)
+	Process(ctx context.Context, client *tgbotapi.Bot, update tgbotapi.Update)
 }

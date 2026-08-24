@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
-	"github.com/aliforever/go-telegram-bot-api"
+	tgbotapi "github.com/aliforever/go-telegram-bot-api/v2"
 )
 
 type Generator struct {
@@ -34,17 +36,17 @@ func (g *Generator) Generate() error {
 		return err
 	}
 
-	bot, err := tgbotapi.New(g.BotToken)
+	bot := tgbotapi.New(g.BotToken)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	me, err := bot.Me(ctx)
 	if err != nil {
 		return err
 	}
 
-	me, err := bot.Send(bot.GetMe())
-	if err != nil {
-		return err
-	}
-
-	g.botName = me.User.Username
+	g.botName = me.Username
 
 	fmt.Printf("Bot Username: %s - ModulePath: %s\n", g.botName, g.ModulePath)
 
@@ -344,8 +346,9 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"os/signal"
 
-	"github.com/aliforever/go-telegram-bot-api"
+	tgbotapi "github.com/aliforever/go-telegram-bot-api/v2"
 	"github.com/aliforever/go-telejoon"
 	"github.com/caarlos0/env/v8"
 	"github.com/redis/go-redis/v9"
@@ -379,18 +382,19 @@ func main() {
 		slog.String("redisAddress", cfg.Redis.Address),
 	)
 
-	botAPI, err := tgbotapi.New(cfg.BotToken)
-	if err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	// v2's New performs no network I/O; validate the token explicitly with Me.
+	botAPI := tgbotapi.New(cfg.BotToken)
+
+	if _, err := botAPI.Me(ctx); err != nil {
 		logger.Error(
 			"Failed to create bot",
 			slog.Any("error", err),
 		)
 
 		return
-	}
-
-	if cfg.LogGroupID != 0 {
-		logger = slog.New(botAPI.SlogHandler(logHandler, cfg.LogGroupID))
 	}
 
 	mongoClient, err := mongo.Connect(options.Client().ApplyURI(cfg.Mongo.Uri))
@@ -435,15 +439,8 @@ func main() {
 		return
 	}
 
-	go bot.NewBot(botAPI, repo, languages, cfg.LogGroupID, logger).Start()
-
-	pollErr := botAPI.GetUpdates().LongPoll()
-	if pollErr != nil {
-		logger.Error(
-			"Failed to poll for updates",
-			slog.Any("error", pollErr),
-		)
-	}
+	// Start long-polls and blocks until the context is cancelled.
+	bot.NewBot(botAPI, repo, languages, cfg.LogGroupID, logger).Start(ctx)
 }`
 
 	return g.replaceModulePath(tpl)
@@ -806,16 +803,17 @@ func (g *Generator) templateBot() string {
 	tpl := `package bot
 
 import (
+	"context"
 	"log/slog"
 
-	"github.com/aliforever/go-telegram-bot-api"
+	tgbotapi "github.com/aliforever/go-telegram-bot-api/v2"
 	"github.com/aliforever/go-telejoon"
 
 	"{{MODULE_PATH}}/lib/bot/db"
 )
 
 type Bot struct {
-	api            *tgbotapi.TelegramBot
+	api            *tgbotapi.Bot
 	repository     *db.Repository
 	languageConfig *telejoon.LanguageConfig
 	logGroupID     int64
@@ -823,7 +821,7 @@ type Bot struct {
 }
 
 func NewBot(
-	api *tgbotapi.TelegramBot,
+	api *tgbotapi.Bot,
 	repository *db.Repository,
 	languages *telejoon.Languages,
 	logGroupID int64,
@@ -863,9 +861,12 @@ func (b *Bot) NewEngine() *telejoon.Engine {
 	return engine
 }
 
-func (b *Bot) Start() {
-	for update := range b.api.Updates() {
-		go b.NewEngine().Process(b.api, update)
+// Start long-polls for updates and blocks until ctx is cancelled.
+func (b *Bot) Start(ctx context.Context) {
+	engine := b.NewEngine()
+
+	if err := telejoon.Start(ctx, b.api, engine); err != nil {
+		b.logger.Info("stopped", "error", err)
 	}
 }
 `

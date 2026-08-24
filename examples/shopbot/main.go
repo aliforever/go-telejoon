@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	tgbotapi "github.com/aliforever/go-telegram-bot-api"
+	tgbotapi "github.com/aliforever/go-telegram-bot-api/v2"
 	"github.com/aliforever/go-telejoon"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/text/language"
@@ -27,8 +27,13 @@ func main() {
 		return
 	}
 
-	client, err := tgbotapi.New(token)
-	if err != nil {
+	// v2's New performs no network I/O; validate the token explicitly with Me.
+	client := tgbotapi.New(token)
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	if _, err := client.Me(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, "create bot:", err)
 
 		return
@@ -63,7 +68,7 @@ func main() {
 		// Required for GoToWith payloads to survive to the user's NEXT
 		// message (e.g. the checkout address). See store.go.
 		WithStateDataRepository(&memoryStateDataRepository{}).
-		WithPanicHandler(func(client *tgbotapi.TelegramBot, update tgbotapi.Update, err any, trace string) {
+		WithPanicHandler(func(client *tgbotapi.Bot, update tgbotapi.Update, err any, trace string) {
 			// Panics are recovered per update; the bot stays up.
 			logger.Errorf("panic: %v\n%s", err, trace)
 		}).
@@ -107,16 +112,17 @@ func main() {
 	// to the next handler, false to stop.
 
 	group := telejoon.NewGroupHandlers().
-		AddMiddleware(func(client *tgbotapi.TelegramBot, update tgbotapi.Update) bool {
+		AddMiddleware(func(ctx context.Context, client *tgbotapi.Bot, update tgbotapi.Update) bool {
 			logger.Debug("group update")
 
 			return true
 		}).
-		AddHandler(func(client *tgbotapi.TelegramBot, update tgbotapi.Update) bool {
+		AddHandler(func(ctx context.Context, client *tgbotapi.Bot, update tgbotapi.Update) bool {
 			if update.Message != nil && strings.Contains(update.Message.Text, "/shop") {
-				_, err := client.Send(client.Message().
-					SetChatId(update.Message.Chat.Id).
-					SetText("Open a private chat with me to browse the shop!"))
+				_, err := client.Message().
+					ChatID(update.Message.Chat.Id).
+					Text("Open a private chat with me to browse the shop!").
+					Send(ctx)
 				if err != nil {
 					logger.Error("group reply: ", err)
 				}
@@ -128,7 +134,7 @@ func main() {
 		})
 
 	channel := telejoon.NewChannelHandlers().
-		AddHandler(func(client *tgbotapi.TelegramBot, update tgbotapi.Update) bool {
+		AddHandler(func(ctx context.Context, client *tgbotapi.Bot, update tgbotapi.Update) bool {
 			if post := update.ChannelPost; post != nil {
 				logger.Infof("channel post: %s", post.Text)
 			}
@@ -142,19 +148,10 @@ func main() {
 
 	// === Start ===
 
-	go func() {
-		if err := client.GetUpdates().LongPoll(); err != nil {
-			logger.Error("long poll: ", err)
-		}
-	}()
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
-
 	logger.Info("shopbot running — Ctrl+C for graceful shutdown")
 
-	// Start blocks until the context is cancelled or updates close, waiting
-	// for in-flight updates to finish.
+	// Start long-polls and blocks until the context is cancelled, waiting for
+	// in-flight updates to finish.
 	if err := telejoon.Start(ctx, client, multi); err != nil {
 		logger.Info("stopped: ", err)
 	}

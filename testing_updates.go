@@ -3,7 +3,7 @@ package telejoon
 import (
 	"sync"
 
-	tgbotapi "github.com/aliforever/go-telegram-bot-api"
+	tgbotapi "github.com/aliforever/go-telegram-bot-api/v2"
 	"github.com/aliforever/go-telegram-bot-api/structs"
 )
 

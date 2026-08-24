@@ -1,9 +1,10 @@
 package telejoon
 
 import (
+	"context"
 	"sync"
 
-	tgbotapi "github.com/aliforever/go-telegram-bot-api"
+	tgbotapi "github.com/aliforever/go-telegram-bot-api/v2"
 )
 
 // MultiProcessor routes updates to multiple processors based on their canProcess method.
@@ -18,11 +19,11 @@ type MultiProcessor struct {
 //
 // Example:
 //
-//	privateHandler := telejoon.WithPrivateStateHandlers(userRepo, "Welcome")
+//	engine := telejoon.New(userRepo, stateWelcome)
 //	groupHandler := telejoon.NewGroupHandlers()
 //	channelHandler := telejoon.NewChannelHandlers()
 //
-//	multi := telejoon.NewMultiProcessor(privateHandler, groupHandler, channelHandler)
+//	multi := telejoon.NewMultiProcessor(engine, groupHandler, channelHandler)
 //	telejoon.Start(ctx, client, multi)
 func NewMultiProcessor(processors ...Processor) *MultiProcessor {
 	return &MultiProcessor{
@@ -56,10 +57,10 @@ func (m *MultiProcessor) canProcess(update tgbotapi.Update) bool {
 	return false
 }
 
-func (m *MultiProcessor) Process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
+func (m *MultiProcessor) Process(ctx context.Context, client *tgbotapi.Bot, update tgbotapi.Update) {
 	for _, p := range m.snapshot() {
 		if p.canProcess(update) {
-			p.Process(client, update)
+			p.Process(ctx, client, update)
 			return
 		}
 	}
@@ -67,10 +68,10 @@ func (m *MultiProcessor) Process(client *tgbotapi.TelegramBot, update tgbotapi.U
 
 // ProcessAll processes the update with all processors that can handle it.
 // Unlike Process, this doesn't stop after the first matching processor.
-func (m *MultiProcessor) ProcessAll(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
+func (m *MultiProcessor) ProcessAll(ctx context.Context, client *tgbotapi.Bot, update tgbotapi.Update) {
 	for _, p := range m.snapshot() {
 		if p.canProcess(update) {
-			p.Process(client, update)
+			p.Process(ctx, client, update)
 		}
 	}
 }

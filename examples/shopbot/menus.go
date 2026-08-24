@@ -191,8 +191,10 @@ func checkoutMenu() *telejoon.MenuBuilder[CheckoutData] {
 			// ctx.Client() is the escape hatch for operations that no Action
 			// covers; here we send a confirmation AND transition afterwards.
 			done := telejoon.L("Checkout.Done")(ctx)
-			if _, err := ctx.Client().Send(ctx.Client().Message().
-				SetChatId(ctx.ChatID()).SetText(done)); err != nil {
+			if _, err := ctx.Client().Message().
+				ChatID(ctx.ChatID()).
+				Text(done).
+				Send(ctx.Context()); err != nil {
 				return telejoon.Error(err)
 			}
 
@@ -340,14 +342,14 @@ func adminMenu() *telejoon.MenuBuilder[telejoon.NoData] {
 				// External transition with no update in flight for the target
 				// user (here: self, for demo). Only State[NoData] targets —
 				// typed payloads belong to in-processing GoToWith.
-				if err := botEngine.SwitchUserState(ctx.Client(), ctx.UserID(), stateOrderReady); err != nil {
+				if err := botEngine.SwitchUserState(ctx.Context(), ctx.Client(), ctx.UserID(), stateOrderReady); err != nil {
 					return telejoon.Error(err)
 				}
 
 				return telejoon.Stop()
 			case "sendcatalog":
 				// External inline-menu push for a given update.
-				if err := botEngine.SendInlineMenu(ctx.Client(), ctx.Update, menuCatalog, false); err != nil {
+				if err := botEngine.SendInlineMenu(ctx.Context(), ctx.Client(), ctx.Update, menuCatalog, false); err != nil {
 					return telejoon.Error(err)
 				}
 

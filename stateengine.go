@@ -1,6 +1,7 @@
 package telejoon
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	tgbotapi "github.com/aliforever/go-telegram-bot-api"
+	tgbotapi "github.com/aliforever/go-telegram-bot-api/v2"
 )
 
 // Engine is the private-chat state machine: it resolves the user's state,
@@ -315,26 +316,27 @@ func (e *Engine) canProcess(update tgbotapi.Update) bool {
 
 // Process handles a single private-chat update. Each update runs in its own
 // goroutine (see Start), so panics are recovered per update.
-func (e *Engine) Process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
+func (e *Engine) Process(reqCtx context.Context, client *tgbotapi.Bot, update tgbotapi.Update) {
 	defer func() {
 		if r := recover(); r != nil {
 			if panicHandler := e.getPanicHandler(); panicHandler != nil {
 				panicHandler(client, update, r, string(debug.Stack()))
 			} else {
-				e.onErr(client, update, fmt.Errorf("panic: %v\n%s", r, debug.Stack()))
+				e.onErr(reqCtx, client, update, fmt.Errorf("panic: %v\n%s", r, debug.Stack()))
 			}
 		}
 	}()
 
 	userState, err := e.processUserState(update)
 	if err != nil {
-		e.onErr(client, update, err)
+		e.onErr(reqCtx, client, update, err)
 		return
 	}
 
 	ctx := &Ctx{
 		client:  client,
 		engine:  e,
+		reqCtx:  reqCtx,
 		session: &sync.Map{},
 		State:   userState,
 		Update:  update,
@@ -343,7 +345,7 @@ func (e *Engine) Process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
 	from := update.From()
 	if from == nil {
 		j, _ := json.Marshal(update)
-		e.onErr(client, update, fmt.Errorf("update.From() is nil: %s", string(j)))
+		e.onErr(reqCtx, client, update, fmt.Errorf("update.From() is nil: %s", string(j)))
 
 		return
 	}
@@ -365,18 +367,19 @@ func (e *Engine) Process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
 			if languageConfig.forceChooseLanguage && languageConfig.changeLanguageState != "" {
 				if update.CallbackQuery != nil {
 					go func() {
-						_, err := client.Send(client.AnswerCallbackQuery().
-							SetCallbackQueryId(update.CallbackQuery.Id).
-							SetShowAlert(false))
+						_, err := client.AnswerCallbackQuery().
+							CallbackQueryID(update.CallbackQuery.Id).
+							ShowAlert(false).
+							Send(reqCtx)
 						if err != nil {
-							e.onErr(client, update, err)
+							e.onErr(reqCtx, client, update, err)
 						}
 					}()
 				}
 
 				if userState != languageConfig.changeLanguageState {
 					if err := e.switchState(ctx, languageConfig.changeLanguageState, nil); err != nil {
-						e.onErr(client, update, err)
+						e.onErr(reqCtx, client, update, err)
 					}
 
 					return
@@ -386,7 +389,7 @@ func (e *Engine) Process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
 		default:
 			// Real repository error (e.g. database down): surface it instead of
 			// silently misbehaving.
-			e.onErr(client, update, fmt.Errorf("get_user_language: %w", err))
+			e.onErr(reqCtx, client, update, fmt.Errorf("get_user_language: %w", err))
 
 			return
 		}
@@ -407,11 +410,11 @@ func (e *Engine) Process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
 
 		// The persisted state has no registered menu (e.g. left over from a
 		// previous deploy): report it and reset the user to the default state.
-		e.onErr(client, update, fmt.Errorf("no_handler_for_state: %s", userState))
+		e.onErr(reqCtx, client, update, fmt.Errorf("no_handler_for_state: %s", userState))
 
 		if userState != e.defaultState {
 			if err := e.switchState(ctx, e.defaultState, nil); err != nil {
-				e.onErr(client, update, err)
+				e.onErr(reqCtx, client, update, err)
 			}
 		}
 
@@ -425,7 +428,13 @@ func (e *Engine) Process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
 
 // SwitchUserState transitions a user to a payload-less state from outside of
 // update processing (e.g. a background job).
-func (e *Engine) SwitchUserState(client *tgbotapi.TelegramBot, userID int64, state State[NoData]) error {
+func (e *Engine) SwitchUserState(
+	reqCtx context.Context,
+	client *tgbotapi.Bot,
+	userID int64,
+	state State[NoData],
+) error {
+
 	lang, err := e.userLanguage(userID)
 	if err != nil {
 		return err
@@ -434,6 +443,7 @@ func (e *Engine) SwitchUserState(client *tgbotapi.TelegramBot, userID int64, sta
 	ctx := &Ctx{
 		client:     client,
 		engine:     e,
+		reqCtx:     reqCtx,
 		session:    &sync.Map{},
 		State:      state.name,
 		language:   lang,
@@ -446,7 +456,8 @@ func (e *Engine) SwitchUserState(client *tgbotapi.TelegramBot, userID int64, sta
 
 // SendInlineMenu sends (or edits into) an inline menu for the given update.
 func (e *Engine) SendInlineMenu(
-	client *tgbotapi.TelegramBot,
+	reqCtx context.Context,
+	client *tgbotapi.Bot,
 	update tgbotapi.Update,
 	menu InlineMenuRef,
 	edit bool,
@@ -469,6 +480,7 @@ func (e *Engine) SendInlineMenu(
 	ctx := &Ctx{
 		client:   client,
 		engine:   e,
+		reqCtx:   reqCtx,
 		session:  &sync.Map{},
 		State:    userState,
 		language: lang,
@@ -533,7 +545,7 @@ func (e *Engine) processAction(ctx *Ctx, result actionResult) {
 	}
 
 	if err != nil {
-		e.onErr(ctx.client, ctx.Update, err)
+		e.onErr(ctx.Context(), ctx.client, ctx.Update, err)
 	}
 }
 
@@ -548,7 +560,7 @@ func (e *Engine) processStateMenu(ctx *Ctx, runtime *menuRuntime) {
 
 	markup, byLabel, err := e.renderReplyKeyboard(ctx, runtime)
 	if err != nil {
-		e.onErr(ctx.client, ctx.Update, err)
+		e.onErr(ctx.Context(), ctx.client, ctx.Update, err)
 
 		return
 	}
@@ -621,12 +633,13 @@ func (e *Engine) processStateMenu(ctx *Ctx, runtime *menuRuntime) {
 	}
 
 	if replyText := runtime.text(ctx); replyText != "" {
-		_, err := ctx.client.Send(ctx.client.Message().
-			SetText(replyText).
-			SetChatId(ctx.UserID()).
-			SetReplyMarkup(markup))
+		_, err := ctx.client.Message().
+			ChatID(ctx.UserID()).
+			Text(replyText).
+			ReplyMarkup(markup).
+			Send(ctx.Context())
 		if err != nil {
-			e.onErr(ctx.client, ctx.Update,
+			e.onErr(ctx.Context(), ctx.client, ctx.Update,
 				fmt.Errorf("error_sending_message_to_user: %d, %w", ctx.UserID(), err))
 		}
 	}
@@ -666,7 +679,7 @@ func (e *Engine) processCallbackQuery(ctx *Ctx) {
 
 	if runtime, ok := e.getInlineMenu(parts[0]); ok {
 		if len(parts) < 2 {
-			e.onErr(ctx.client, ctx.Update, fmt.Errorf("empty_callback_action: %s", runtime.name))
+			e.onErr(ctx.Context(), ctx.client, ctx.Update, fmt.Errorf("empty_callback_action: %s", runtime.name))
 
 			return
 		}
@@ -678,28 +691,29 @@ func (e *Engine) processCallbackQuery(ctx *Ctx) {
 		switch parts[1] {
 		case "@a": // alert button
 			if len(parts) < 4 {
-				e.onErr(ctx.client, ctx.Update, fmt.Errorf("malformed_alert_callback: %s", data))
+				e.onErr(ctx.Context(), ctx.client, ctx.Update, fmt.Errorf("malformed_alert_callback: %s", data))
 
 				return
 			}
 
 			text, err := url.QueryUnescape(parts[3])
 			if err != nil {
-				e.onErr(ctx.client, ctx.Update, fmt.Errorf("malformed_alert_callback: %s", data))
+				e.onErr(ctx.Context(), ctx.client, ctx.Update, fmt.Errorf("malformed_alert_callback: %s", data))
 
 				return
 			}
 
-			_, err = ctx.client.Send(ctx.client.AnswerCallbackQuery().
-				SetCallbackQueryId(ctx.Update.CallbackQuery.Id).
-				SetText(text).
-				SetShowAlert(parts[2] == "1"))
+			_, err = ctx.client.AnswerCallbackQuery().
+				CallbackQueryID(ctx.Update.CallbackQuery.Id).
+				Text(text).
+				ShowAlert(parts[2] == "1").
+				Send(ctx.Context())
 			if err != nil {
-				e.onErr(ctx.client, ctx.Update, err)
+				e.onErr(ctx.Context(), ctx.client, ctx.Update, err)
 			}
 		case "@m", "@e", "@s": // open menu / edit into menu / switch state
 			if len(parts) < 3 || !validRouteName(parts[2]) {
-				e.onErr(ctx.client, ctx.Update, fmt.Errorf("malformed_callback: %s", data))
+				e.onErr(ctx.Context(), ctx.client, ctx.Update, fmt.Errorf("malformed_callback: %s", data))
 
 				return
 			}
@@ -719,7 +733,7 @@ func (e *Engine) processCallbackQuery(ctx *Ctx) {
 		default:
 			handler := runtime.routes[parts[1]]
 			if handler == nil {
-				e.onErr(ctx.client, ctx.Update,
+				e.onErr(ctx.Context(), ctx.client, ctx.Update,
 					fmt.Errorf("handler_for_action_not_found: %s", data))
 
 				return
@@ -747,7 +761,7 @@ func (e *Engine) processCallbackQuery(ctx *Ctx) {
 		return
 	}
 
-	e.onErr(ctx.client, ctx.Update, fmt.Errorf("callback_query_handler_not_found: %s", parts[0]))
+	e.onErr(ctx.Context(), ctx.client, ctx.Update, fmt.Errorf("callback_query_handler_not_found: %s", parts[0]))
 }
 
 // processInlineMenu renders and sends (or edits into) an inline menu.
@@ -769,7 +783,7 @@ func (e *Engine) processInlineMenu(ctx *Ctx, name string, edit bool) error {
 	if err != nil {
 		// Report, but still render: the markup simply omits the buttons that
 		// failed to encode, instead of failing the whole menu silently.
-		e.onErr(ctx.client, ctx.Update, err)
+		e.onErr(ctx.Context(), ctx.client, ctx.Update, err)
 	}
 
 	if runtime.text == nil {
@@ -781,25 +795,26 @@ func (e *Engine) processInlineMenu(ctx *Ctx, name string, edit bool) error {
 		return fmt.Errorf("inline_menu_reply_text_not_set: %s", name)
 	}
 
-	var cfg tgbotapi.Config
-
 	if edit {
 		if ctx.Update.CallbackQuery == nil || ctx.Update.CallbackQuery.Message == nil {
 			return fmt.Errorf("cannot edit message: callback query or message is nil")
 		}
 
-		cfg = ctx.client.EditMessageText().SetText(replyText).
-			SetChatId(ctx.UserID()).
-			SetMessageId(ctx.Update.CallbackQuery.Message.MessageId).
-			SetReplyMarkup(markup)
+		_, err = ctx.client.EditMessageText().
+			Text(replyText).
+			ChatID(ctx.UserID()).
+			MessageID(ctx.Update.CallbackQuery.Message.MessageId).
+			ReplyMarkup(markup).
+			Send(ctx.Context())
 	} else {
-		cfg = ctx.client.Message().
-			SetText(replyText).
-			SetChatId(ctx.UserID()).
-			SetReplyMarkup(markup)
+		_, err = ctx.client.Message().
+			ChatID(ctx.UserID()).
+			Text(replyText).
+			ReplyMarkup(markup).
+			Send(ctx.Context())
 	}
 
-	if _, err := ctx.client.Send(cfg); err != nil {
+	if err != nil {
 		return fmt.Errorf("error_sending_message_to_user: %d, %w", ctx.UserID(), err)
 	}
 
@@ -814,11 +829,12 @@ func (e *Engine) answerCallback(ctx *Ctx) {
 	}
 
 	go func() {
-		_, err := ctx.client.Send(ctx.client.AnswerCallbackQuery().
-			SetCallbackQueryId(ctx.Update.CallbackQuery.Id).
-			SetShowAlert(false))
+		_, err := ctx.client.AnswerCallbackQuery().
+			CallbackQueryID(ctx.Update.CallbackQuery.Id).
+			ShowAlert(false).
+			Send(ctx.Context())
 		if err != nil {
-			e.onErr(ctx.client, ctx.Update, err)
+			e.onErr(ctx.Context(), ctx.client, ctx.Update, err)
 		}
 	}()
 }

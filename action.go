@@ -1,6 +1,6 @@
 package telejoon
 
-import tgbotapi "github.com/aliforever/go-telegram-bot-api"
+import tgbotapi "github.com/aliforever/go-telegram-bot-api/v2"
 
 // Action is the single result a handler returns, replacing the old
 // (SwitchAction, ShouldPass) pair. It is a sealed interface: construct values
@@ -68,7 +68,7 @@ type Handler func(ctx *Ctx) Action
 
 // PanicHandler is called when a panic is recovered while processing an update.
 type PanicHandler func(
-	client *tgbotapi.TelegramBot,
+	client *tgbotapi.Bot,
 	update tgbotapi.Update,
 	err interface{},
 	trace string,

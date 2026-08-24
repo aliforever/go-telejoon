@@ -269,7 +269,7 @@ func (b *MenuBuilder[D]) compile() *menuRuntime {
 				return &copied
 			}
 
-			ctx.engine.onErr(ctx.client, ctx.Update,
+			ctx.engine.onErr(ctx.Context(), ctx.client, ctx.Update,
 				fmt.Errorf("state_data_type_mismatch: %s", b.state.name))
 		}
 
@@ -280,11 +280,11 @@ func (b *MenuBuilder[D]) compile() *menuRuntime {
 
 			switch {
 			case err != nil:
-				ctx.engine.onErr(ctx.client, ctx.Update,
+				ctx.engine.onErr(ctx.Context(), ctx.client, ctx.Update,
 					fmt.Errorf("state_data_load: %s: %w", b.state.name, err))
 			case len(raw) > 0:
 				if err := unmarshalStateData(raw, data); err != nil {
-					ctx.engine.onErr(ctx.client, ctx.Update,
+					ctx.engine.onErr(ctx.Context(), ctx.client, ctx.Update,
 						fmt.Errorf("state_data_decode: %s: %w", b.state.name, err))
 				}
 			}

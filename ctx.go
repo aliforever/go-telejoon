@@ -1,11 +1,12 @@
 package telejoon
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
 
-	tgbotapi "github.com/aliforever/go-telegram-bot-api"
+	tgbotapi "github.com/aliforever/go-telegram-bot-api/v2"
 )
 
 // Key is a typed session-storage key. Keys are unforgeable: two keys created
@@ -38,8 +39,13 @@ func (k Key[T]) String() string {
 // A Ctx belongs to the goroutine processing its update. Spawned child
 // goroutines must synchronize their own access.
 type Ctx struct {
-	client *tgbotapi.TelegramBot
+	client *tgbotapi.Bot
 	engine *Engine
+
+	// reqCtx is the request's context: the context passed to Engine.Process
+	// (detached from the polling context on shutdown), or Background for
+	// external operations and tests.
+	reqCtx context.Context
 
 	session *sync.Map
 
@@ -124,8 +130,17 @@ func (c *Ctx) Delete[T any](key Key[T]) {
 // === Client, language, and raw access ===
 
 // Client returns the underlying Telegram bot client for advanced use.
-func (c *Ctx) Client() *tgbotapi.TelegramBot {
+func (c *Ctx) Client() *tgbotapi.Bot {
 	return c.client
+}
+
+// Context returns the request's context (for client sends and cancellation).
+func (c *Ctx) Context() context.Context {
+	if c.reqCtx == nil {
+		return context.Background()
+	}
+
+	return c.reqCtx
 }
 
 // Language returns the user's resolved language, or nil when languages are
@@ -155,7 +170,7 @@ func (c *Ctx) GoToWith[D any](state State[D], data D) Action {
 
 // ReplyText sends a text message to the user and stops processing.
 func (c *Ctx) ReplyText(text string) Action {
-	_, err := c.client.Send(c.client.Message().SetText(text).SetChatId(c.ChatID()))
+	_, err := c.client.Message().ChatID(c.ChatID()).Text(text).Send(c.Context())
 	if err != nil {
 		return Error(fmt.Errorf("error_sending_message_to_user: %d, %w", c.ChatID(), err))
 	}
@@ -170,10 +185,11 @@ func (c *Ctx) AnswerCallback(text string, showAlert bool) Action {
 		return Error(fmt.Errorf("answer_callback: not a callback query"))
 	}
 
-	_, err := c.client.Send(c.client.AnswerCallbackQuery().
-		SetCallbackQueryId(c.Update.CallbackQuery.Id).
-		SetText(text).
-		SetShowAlert(showAlert))
+	_, err := c.client.AnswerCallbackQuery().
+		CallbackQueryID(c.Update.CallbackQuery.Id).
+		Text(text).
+		ShowAlert(showAlert).
+		Send(c.Context())
 	if err != nil {
 		return Error(fmt.Errorf("answer_callback: %w", err))
 	}

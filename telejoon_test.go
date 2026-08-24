@@ -6,11 +6,12 @@
 package telejoon_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
 
-	tgbotapi "github.com/aliforever/go-telegram-bot-api"
+	tgbotapi "github.com/aliforever/go-telegram-bot-api/v2"
 	"github.com/aliforever/go-telejoon"
 	"golang.org/x/text/language"
 )
@@ -31,27 +32,19 @@ type callbackArgs struct {
 }
 
 func TestStart(t *testing.T) {
-	var stop = make(chan bool)
+	botToken := os.Getenv("BOT_TOKEN")
+	if botToken == "" {
+		t.Skip("BOT_TOKEN is not set")
+	}
 
-	client := func() *tgbotapi.TelegramBot {
-		botToken := os.Getenv("BOT_TOKEN")
-		if botToken == "" {
-			t.Skip("BOT_TOKEN is not set")
-		}
+	// v2's New performs no network I/O; validate explicitly with Me.
+	client := tgbotapi.New(botToken)
 
-		c, err := tgbotapi.New(botToken)
-		if err != nil {
-			t.Fatal(err)
-		}
+	ctx := context.Background()
 
-		go func() {
-			if err := c.GetUpdates().LongPoll(); err != nil {
-				panic(err)
-			}
-		}()
-
-		return c
-	}()
+	if _, err := client.Me(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	languages, err := telejoon.NewLanguageBuilder(language.English).
 		RegisterTomlFormat([]string{
@@ -85,7 +78,7 @@ func TestStart(t *testing.T) {
 	engine := telejoon.New(telejoon.NewDefaultUserRepository(), stateWelcome,
 		telejoon.NewOptions().SetErrorGroupID(81997375)).
 		WithLanguageConfig(languageConfig).
-		WithPanicHandler(func(client *tgbotapi.TelegramBot, update tgbotapi.Update, err any, stack string) {
+		WithPanicHandler(func(client *tgbotapi.Bot, update tgbotapi.Update, err any, stack string) {
 			fmt.Println("Panic Handler", update, "\n", stack)
 		}).
 		Use(func(ctx *telejoon.Ctx) telejoon.Action {
@@ -141,9 +134,8 @@ func TestStart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for update := range client.Updates() {
-		engine.Process(client, update)
+	// Start long-polls and blocks until the context is cancelled.
+	if err := telejoon.Start(ctx, client, engine); err != nil {
+		fmt.Println("stopped:", err)
 	}
-
-	<-stop
 }

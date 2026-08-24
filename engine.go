@@ -1,11 +1,12 @@
 package telejoon
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 
-	"github.com/aliforever/go-telegram-bot-api"
+	tgbotapi "github.com/aliforever/go-telegram-bot-api/v2"
 )
 
 // maxErrorMessageLen keeps error reports below Telegram's 4096-character message limit.
@@ -26,26 +27,8 @@ func newEngine(opts ...*Options) engine {
 	return engine{}
 }
 
-// sendConfigWithErrHandler is a helper function to send a message with a config and handle errors.
-func (t *engine) sendConfigWithErrHandler(
-	client *tgbotapi.TelegramBot, config tgbotapi.Config, update tgbotapi.Update) (*tgbotapi.Response, error) {
-
-	if t.opts != nil && t.opts.Logger != nil {
-		j, _ := json.Marshal(config)
-		t.opts.Logger.Infof("Sending message: %s", string(j))
-	}
-
-	resp, err := client.Send(config)
-	if err != nil {
-		t.onErr(client, update, err)
-		return nil, err
-	}
-
-	return resp, nil
-}
-
 func (t *engine) onErr(
-	client *tgbotapi.TelegramBot, update tgbotapi.Update, err error) {
+	ctx context.Context, client *tgbotapi.Bot, update tgbotapi.Update, err error) {
 
 	j, _ := json.Marshal(update)
 
@@ -60,9 +43,10 @@ func (t *engine) onErr(
 	}
 
 	if t.opts.ErrorGroupID != 0 {
-		_, sendErr := client.Send(client.Message().
-			SetChatId(t.opts.ErrorGroupID).
-			SetText(msg))
+		_, sendErr := client.Message().
+			ChatID(t.opts.ErrorGroupID).
+			Text(msg).
+			Send(ctx)
 		if sendErr != nil {
 			msg = fmt.Sprintf("%s\nerror_sending_to_error_group: %s", msg, sendErr.Error())
 		}

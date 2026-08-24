@@ -1,16 +1,20 @@
 package telejoon
 
 import (
+	"context"
 	"fmt"
 	"runtime/debug"
 	"sync"
 
-	tgbotapi "github.com/aliforever/go-telegram-bot-api"
+	tgbotapi "github.com/aliforever/go-telegram-bot-api/v2"
 )
 
 // GroupUpdateHandler is a function that handles group updates.
 // Return true to continue processing with the next handler, false to stop.
-type GroupUpdateHandler func(client *tgbotapi.TelegramBot, update tgbotapi.Update) bool
+type GroupUpdateHandler func(ctx context.Context, client *tgbotapi.Bot, update tgbotapi.Update) bool
+
+// GroupMiddleware runs before group handlers. Return false to stop processing.
+type GroupMiddleware func(ctx context.Context, client *tgbotapi.Bot, update tgbotapi.Update) bool
 
 // EngineWithGroupHandlers handles group and supergroup chat updates
 type EngineWithGroupHandlers struct {
@@ -18,7 +22,7 @@ type EngineWithGroupHandlers struct {
 
 	m            sync.RWMutex
 	handlers     []GroupUpdateHandler
-	middlewares  []func(client *tgbotapi.TelegramBot, update tgbotapi.Update) bool
+	middlewares  []GroupMiddleware
 	panicHandler PanicHandler
 }
 
@@ -41,7 +45,7 @@ func (e *EngineWithGroupHandlers) AddHandler(handler GroupUpdateHandler) *Engine
 
 // AddMiddleware adds a middleware for group updates.
 // Middlewares are called before handlers. Return false to stop processing.
-func (e *EngineWithGroupHandlers) AddMiddleware(middleware func(client *tgbotapi.TelegramBot, update tgbotapi.Update) bool) *EngineWithGroupHandlers {
+func (e *EngineWithGroupHandlers) AddMiddleware(middleware GroupMiddleware) *EngineWithGroupHandlers {
 	e.m.Lock()
 	defer e.m.Unlock()
 
@@ -65,7 +69,7 @@ func (e *EngineWithGroupHandlers) canProcess(update tgbotapi.Update) bool {
 	return false
 }
 
-func (e *EngineWithGroupHandlers) Process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
+func (e *EngineWithGroupHandlers) Process(ctx context.Context, client *tgbotapi.Bot, update tgbotapi.Update) {
 	// Always recover: each update runs in its own goroutine, so an
 	// unrecovered panic would take down the whole process.
 	defer func() {
@@ -73,7 +77,7 @@ func (e *EngineWithGroupHandlers) Process(client *tgbotapi.TelegramBot, update t
 			if e.panicHandler != nil {
 				e.panicHandler(client, update, r, string(debug.Stack()))
 			} else {
-				e.onErr(client, update, fmt.Errorf("panic: %v\n%s", r, debug.Stack()))
+				e.onErr(ctx, client, update, fmt.Errorf("panic: %v\n%s", r, debug.Stack()))
 			}
 		}
 	}()
@@ -85,14 +89,14 @@ func (e *EngineWithGroupHandlers) Process(client *tgbotapi.TelegramBot, update t
 
 	// Run middlewares
 	for _, mw := range middlewares {
-		if !mw(client, update) {
+		if !mw(ctx, client, update) {
 			return
 		}
 	}
 
 	// Run handlers
 	for _, handler := range handlers {
-		if !handler(client, update) {
+		if !handler(ctx, client, update) {
 			return
 		}
 	}
@@ -100,7 +104,10 @@ func (e *EngineWithGroupHandlers) Process(client *tgbotapi.TelegramBot, update t
 
 // ChannelUpdateHandler is a function that handles channel updates.
 // Return true to continue processing with the next handler, false to stop.
-type ChannelUpdateHandler func(client *tgbotapi.TelegramBot, update tgbotapi.Update) bool
+type ChannelUpdateHandler func(ctx context.Context, client *tgbotapi.Bot, update tgbotapi.Update) bool
+
+// ChannelMiddleware runs before channel handlers. Return false to stop processing.
+type ChannelMiddleware func(ctx context.Context, client *tgbotapi.Bot, update tgbotapi.Update) bool
 
 // EngineWithChannelHandlers handles channel updates
 type EngineWithChannelHandlers struct {
@@ -108,7 +115,7 @@ type EngineWithChannelHandlers struct {
 
 	m            sync.RWMutex
 	handlers     []ChannelUpdateHandler
-	middlewares  []func(client *tgbotapi.TelegramBot, update tgbotapi.Update) bool
+	middlewares  []ChannelMiddleware
 	panicHandler PanicHandler
 }
 
@@ -131,7 +138,7 @@ func (e *EngineWithChannelHandlers) AddHandler(handler ChannelUpdateHandler) *En
 
 // AddMiddleware adds a middleware for channel updates.
 // Middlewares are called before handlers. Return false to stop processing.
-func (e *EngineWithChannelHandlers) AddMiddleware(middleware func(client *tgbotapi.TelegramBot, update tgbotapi.Update) bool) *EngineWithChannelHandlers {
+func (e *EngineWithChannelHandlers) AddMiddleware(middleware ChannelMiddleware) *EngineWithChannelHandlers {
 	e.m.Lock()
 	defer e.m.Unlock()
 
@@ -159,7 +166,7 @@ func (e *EngineWithChannelHandlers) canProcess(update tgbotapi.Update) bool {
 	return false
 }
 
-func (e *EngineWithChannelHandlers) Process(client *tgbotapi.TelegramBot, update tgbotapi.Update) {
+func (e *EngineWithChannelHandlers) Process(ctx context.Context, client *tgbotapi.Bot, update tgbotapi.Update) {
 	// Always recover: each update runs in its own goroutine, so an
 	// unrecovered panic would take down the whole process.
 	defer func() {
@@ -167,7 +174,7 @@ func (e *EngineWithChannelHandlers) Process(client *tgbotapi.TelegramBot, update
 			if e.panicHandler != nil {
 				e.panicHandler(client, update, r, string(debug.Stack()))
 			} else {
-				e.onErr(client, update, fmt.Errorf("panic: %v\n%s", r, debug.Stack()))
+				e.onErr(ctx, client, update, fmt.Errorf("panic: %v\n%s", r, debug.Stack()))
 			}
 		}
 	}()
@@ -179,14 +186,14 @@ func (e *EngineWithChannelHandlers) Process(client *tgbotapi.TelegramBot, update
 
 	// Run middlewares
 	for _, mw := range middlewares {
-		if !mw(client, update) {
+		if !mw(ctx, client, update) {
 			return
 		}
 	}
 
 	// Run handlers
 	for _, handler := range handlers {
-		if !handler(client, update) {
+		if !handler(ctx, client, update) {
 			return
 		}
 	}
