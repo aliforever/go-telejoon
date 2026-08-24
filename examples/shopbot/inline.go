@@ -37,8 +37,9 @@ var trackRoute telejoon.Route[int64]
 func catalogMenu() *telejoon.InlineMenuBuilder {
 	catalog := telejoon.InlineMenuFor(menuCatalog, telejoon.L("Products.Title")).
 		Use(func(ctx *telejoon.Ctx) telejoon.Action {
-			// Inline-menu middleware runs both when the menu renders and when
-			// its menu-scoped callbacks fire.
+			// Inline-menu middleware runs when the menu's callbacks fire and
+			// when the menu renders — but at most once per update, even for
+			// the refresh idiom below (route -> Edit of the same menu).
 			return telejoon.Next()
 		})
 
@@ -59,10 +60,9 @@ func catalogMenu() *telejoon.InlineMenuBuilder {
 
 		addToCart(ctx.UserID(), p.ID)
 
-		// Custom Do routes are NOT auto-answered: answer the callback (side
-		// effect) before returning the transition, or the client's spinner
-		// runs until timeout. Built-in alert/menu/state buttons answer
-		// themselves.
+		// Answering with a text shows a toast; a plain no-op answer is sent
+		// automatically after the route when the handler did not answer, so
+		// the client's spinner never runs until timeout.
 		_ = ctx.AnswerCallback(telejoon.L("Products.Added")(ctx), false)
 
 		return ctx.GoToWith(stateCheckout, CheckoutData{ProductID: p.ID, Qty: 1})
@@ -78,10 +78,10 @@ func catalogMenu() *telejoon.InlineMenuBuilder {
 			p.Name, p.Price, p.InStock), true)
 	}, telejoon.WithCodec(telejoon.JSONCodec[detailsArgs]()))
 
-	// A NoData payload route — the "refresh" idiom.
+	// A NoData payload route — the "refresh" idiom. The callback is answered
+	// automatically, and the menu's middleware chain does not re-run for the
+	// re-render: a menu's chain runs at most once per update.
 	refresh := catalog.Route("refresh", func(ctx *telejoon.Ctx, _ telejoon.NoData) telejoon.Action {
-		_ = ctx.AnswerCallback("", false)
-
 		return telejoon.Edit(menuCatalog) // re-render in place
 	})
 

@@ -167,6 +167,22 @@ func (e *Engine) WithLanguageConfig(cfg *LanguageConfig) *Engine {
 		return label
 	}
 
+	// Chooser labels double as dispatch keys, so two languages translating to
+	// the same label would make the second one unselectable. That is a
+	// startup misconfiguration: panic loudly instead of misrouting at runtime.
+	seenLabels := map[string]string{}
+
+	for _, lang := range cfg.languages.localizers {
+		label := languageLabel(lang)
+		if other, dup := seenLabels[label]; dup {
+			panic(fmt.Sprintf(
+				"telejoon: change-language menu %q: languages %q and %q share the button label %q",
+				cfg.changeLanguageState, other, lang.tag, label))
+		}
+
+		seenLabels[label] = lang.tag
+	}
+
 	menu := Menu(NewState[NoData](cfg.changeLanguageState), S(text)).
 		ButtonsFunc(func(ctx *Ctx, _ *NoData) []*Button {
 			var buttons []*Button
@@ -183,12 +199,9 @@ func (e *Engine) WithLanguageConfig(cfg *LanguageConfig) *Engine {
 					continue
 				}
 
-				if err := cfg.repo.SetUserLanguage(ctx.UserID(), lang.tag); err != nil {
+				if err := ctx.ChangeLanguage(lang.tag); err != nil {
 					return Error(err)
 				}
-
-				chosen := lang
-				ctx.SetLanguage(&chosen)
 
 				return actionResult{kind: actionKindState, state: e.defaultState}
 			}
@@ -249,6 +262,14 @@ func (e *Engine) Validate() error {
 					return fmt.Errorf("no_menu_for_state: %s (referenced from %s)", button.state, runtime.name)
 				}
 			}
+		}
+	}
+
+	if e.languageConfig != nil && e.languageConfig.languages != nil {
+		// Declared message handles (NewMsg) must localize with the default
+		// language; a typo'd key fails here instead of leaking into a chat.
+		if missing := e.languageConfig.languages.validateMsgs(); len(missing) > 0 {
+			return fmt.Errorf("messages_not_translated: %s", strings.Join(missing, ", "))
 		}
 	}
 
@@ -319,11 +340,7 @@ func (e *Engine) canProcess(update tgbotapi.Update) bool {
 func (e *Engine) Process(reqCtx context.Context, client *tgbotapi.Bot, update tgbotapi.Update) {
 	defer func() {
 		if r := recover(); r != nil {
-			if panicHandler := e.getPanicHandler(); panicHandler != nil {
-				panicHandler(client, update, r, string(debug.Stack()))
-			} else {
-				e.onErr(reqCtx, client, update, fmt.Errorf("panic: %v\n%s", r, debug.Stack()))
-			}
+			e.reportPanic(reqCtx, client, update, r)
 		}
 	}()
 
@@ -354,6 +371,8 @@ func (e *Engine) Process(reqCtx context.Context, client *tgbotapi.Bot, update tg
 
 	var lang *Language
 
+	forceChoose := false
+
 	languageConfig := e.getLanguageConfig()
 
 	if languageConfig != nil {
@@ -362,30 +381,19 @@ func (e *Engine) Process(reqCtx context.Context, client *tgbotapi.Bot, update tg
 		switch {
 		case err == nil:
 			lang = languageConfig.languages.GetByTag(userLanguage)
-		case errors.Is(err, UserLanguageNotFoundErr):
-			// New user without a chosen language.
-			if languageConfig.forceChooseLanguage && languageConfig.changeLanguageState != "" {
-				if update.CallbackQuery != nil {
-					go func() {
-						_, err := client.AnswerCallbackQuery().
-							CallbackQueryID(update.CallbackQuery.Id).
-							ShowAlert(false).
-							Send(reqCtx)
-						if err != nil {
-							e.onErr(reqCtx, client, update, err)
-						}
-					}()
-				}
-
-				if userState != languageConfig.changeLanguageState {
-					if err := e.switchState(ctx, languageConfig.changeLanguageState, nil); err != nil {
-						e.onErr(reqCtx, client, update, err)
-					}
-
-					return
-				}
+			if lang == nil {
+				// The stored tag is not among the configured languages
+				// (e.g. a language was removed): fall back to the default
+				// instead of rendering raw message keys.
+				lang = languageConfig.languages.Default()
 			}
-			// Otherwise proceed without a language; texts fall back gracefully.
+		case errors.Is(err, UserLanguageNotFoundErr):
+			// New user without a chosen language: redirect to the chooser,
+			// but only after the global middlewares have run (below) — an
+			// auth or ban middleware must not be bypassed by first contact.
+			forceChoose = languageConfig.forceChooseLanguage &&
+				languageConfig.changeLanguageState != "" &&
+				userState != languageConfig.changeLanguageState
 		default:
 			// Real repository error (e.g. database down): surface it instead of
 			// silently misbehaving.
@@ -398,6 +406,18 @@ func (e *Engine) Process(reqCtx context.Context, client *tgbotapi.Bot, update tg
 	ctx.language = lang
 
 	if !e.runMiddlewares(ctx, e.getMiddlewares()) {
+		return
+	}
+
+	if forceChoose {
+		if update.CallbackQuery != nil {
+			e.answerCallback(ctx)
+		}
+
+		if err := e.switchState(ctx, languageConfig.changeLanguageState, nil); err != nil {
+			e.onErr(reqCtx, client, update, err)
+		}
+
 		return
 	}
 
@@ -433,7 +453,16 @@ func (e *Engine) SwitchUserState(
 	client *tgbotapi.Bot,
 	userID int64,
 	state State[NoData],
-) error {
+) (err error) {
+
+	// Unlike Process this runs on the caller's goroutine, so recover panics
+	// (e.g. from a menu's text builder) instead of crashing the caller.
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic: %v", r)
+			e.reportPanic(reqCtx, client, tgbotapi.Update{}, r)
+		}
+	}()
 
 	lang, err := e.userLanguage(userID)
 	if err != nil {
@@ -461,7 +490,14 @@ func (e *Engine) SendInlineMenu(
 	update tgbotapi.Update,
 	menu InlineMenuRef,
 	edit bool,
-) error {
+) (err error) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic: %v", r)
+			e.reportPanic(reqCtx, client, update, r)
+		}
+	}()
 
 	userState, err := e.processUserState(update)
 	if err != nil {
@@ -531,6 +567,34 @@ func (e *Engine) runMiddlewares(ctx *Ctx, middlewares []Handler) bool {
 	return true
 }
 
+// runMenuMiddlewares runs a menu's middleware chain at most once per update.
+// A menu can be entered several times while processing one update — a route
+// returning Edit(sameMenu), or a chained state switch re-entering a menu —
+// and re-running its chain would duplicate side effects (database loads,
+// rate limiting, logging). The chain is marked only when it completed; a
+// chain that stopped processing does not suppress a later entry's chain.
+func (e *Engine) runMenuMiddlewares(ctx *Ctx, key string, middlewares []Handler) bool {
+	if len(middlewares) == 0 {
+		return true
+	}
+
+	if _, ok := ctx.enteredMenus[key]; ok {
+		return true
+	}
+
+	if !e.runMiddlewares(ctx, middlewares) {
+		return false
+	}
+
+	if ctx.enteredMenus == nil {
+		ctx.enteredMenus = map[string]struct{}{}
+	}
+
+	ctx.enteredMenus[key] = struct{}{}
+
+	return true
+}
+
 // processAction executes a non-control-flow action result.
 func (e *Engine) processAction(ctx *Ctx, result actionResult) {
 	var err error
@@ -552,11 +616,21 @@ func (e *Engine) processAction(ctx *Ctx, result actionResult) {
 // processStateMenu runs the menu middlewares, dispatches the message to a
 // button / text / part handler, and renders the menu when nothing stopped it.
 func (e *Engine) processStateMenu(ctx *Ctx, runtime *menuRuntime) {
-	if !e.runMiddlewares(ctx, runtime.middlewares) {
+	if !e.runMenuMiddlewares(ctx, "s:"+runtime.state, runtime.middlewares) {
 		return
 	}
 
-	ctx.stateData = runtime.loadData(ctx)
+	stateData, err := runtime.loadData(ctx)
+	if err != nil {
+		// A payload that cannot be loaded or decoded must not reach handlers
+		// as a silent zero value — a checkout handler placing an order for
+		// product 0 is worse than a dropped update.
+		e.onErr(ctx.Context(), ctx.client, ctx.Update, err)
+
+		return
+	}
+
+	ctx.stateData = stateData
 
 	markup, byLabel, err := e.renderReplyKeyboard(ctx, runtime)
 	if err != nil {
@@ -564,6 +638,12 @@ func (e *Engine) processStateMenu(ctx *Ctx, runtime *menuRuntime) {
 
 		return
 	}
+
+	// handlerRan tracks whether any handler consumed (and possibly mutated
+	// things feeding the keyboard) during dispatch. When dispatch then falls
+	// through to the render step, the pre-dispatch keyboard is stale and must
+	// be re-rendered.
+	handlerRan := false
 
 	if !ctx.IsSwitched {
 		if message := ctx.Update.Message; message != nil {
@@ -600,6 +680,8 @@ func (e *Engine) processStateMenu(ctx *Ctx, runtime *menuRuntime) {
 				}
 
 				if runtime.onText != nil {
+					handlerRan = true
+
 					result := asResult(runtime.onText(ctx))
 					if result.kind != actionKindNext {
 						e.processAction(ctx, result)
@@ -618,6 +700,8 @@ func (e *Engine) processStateMenu(ctx *Ctx, runtime *menuRuntime) {
 			}
 
 			if handler != nil {
+				handlerRan = true
+
 				result := asResult(handler(ctx))
 				if result.kind != actionKindNext {
 					e.processAction(ctx, result)
@@ -632,12 +716,37 @@ func (e *Engine) processStateMenu(ctx *Ctx, runtime *menuRuntime) {
 		return
 	}
 
+	if handlerRan {
+		// A handler ran and fell through with Next: re-render the keyboard so
+		// mutations it made (cart contents, toggled flags feeding ButtonsFunc
+		// or When) are reflected in what is sent. Memoized conditions were
+		// evaluated for the pre-dispatch render; clear them so visibility is
+		// re-evaluated against the mutated state.
+		ctx.condResults = nil
+
+		markup, _, err = e.renderReplyKeyboard(ctx, runtime)
+		if err != nil {
+			e.onErr(ctx.Context(), ctx.client, ctx.Update, err)
+
+			return
+		}
+	}
+
 	if replyText := runtime.text(ctx); replyText != "" {
-		_, err := ctx.client.Message().
+		message := ctx.client.Message().
 			ChatID(ctx.UserID()).
-			Text(replyText).
-			ReplyMarkup(markup).
-			Send(ctx.Context())
+			Text(replyText)
+
+		if markup != nil {
+			message.ReplyMarkup(markup)
+		} else {
+			// No visible buttons: explicitly remove any keyboard a previous
+			// state left behind, or its stale buttons would keep dispatching
+			// into this state's OnText as unmatched text.
+			message.RemoveReplyKeyboard()
+		}
+
+		_, err := message.Send(ctx.Context())
 		if err != nil {
 			e.onErr(ctx.Context(), ctx.client, ctx.Update,
 				fmt.Errorf("error_sending_message_to_user: %d, %w", ctx.UserID(), err))
@@ -684,7 +793,7 @@ func (e *Engine) processCallbackQuery(ctx *Ctx) {
 			return
 		}
 
-		if !e.runMiddlewares(ctx, runtime.middlewares) {
+		if !e.runMenuMiddlewares(ctx, "i:"+runtime.name, runtime.middlewares) {
 			return
 		}
 
@@ -745,6 +854,7 @@ func (e *Engine) processCallbackQuery(ctx *Ctx) {
 			}
 
 			e.processAction(ctx, asResult(handler(ctx, payload)))
+			e.answerCallback(ctx)
 		}
 
 		return
@@ -757,6 +867,7 @@ func (e *Engine) processCallbackQuery(ctx *Ctx) {
 		}
 
 		e.processAction(ctx, asResult(handler(ctx, payload)))
+		e.answerCallback(ctx)
 
 		return
 	}
@@ -775,7 +886,7 @@ func (e *Engine) processInlineMenu(ctx *Ctx, name string, edit bool) error {
 		return fmt.Errorf("cannot process inline menu %s: no user in context", name)
 	}
 
-	if !e.runMiddlewares(ctx, runtime.middlewares) {
+	if !e.runMenuMiddlewares(ctx, "i:"+runtime.name, runtime.middlewares) {
 		return nil
 	}
 
@@ -815,6 +926,13 @@ func (e *Engine) processInlineMenu(ctx *Ctx, name string, edit bool) error {
 	}
 
 	if err != nil {
+		// Re-rendering an unchanged menu (the refresh idiom with nothing new
+		// to show) is rejected by Telegram with "message is not modified" —
+		// that is a no-op, not an error.
+		if edit && strings.Contains(err.Error(), "message is not modified") {
+			return nil
+		}
+
 		return fmt.Errorf("error_sending_message_to_user: %d, %w", ctx.UserID(), err)
 	}
 
@@ -822,11 +940,15 @@ func (e *Engine) processInlineMenu(ctx *Ctx, name string, edit bool) error {
 }
 
 // answerCallback fires a no-op answer to the current callback query, stopping
-// the client's loading spinner for internal navigation actions.
+// the client's loading spinner. It is a no-op when the query was already
+// answered (via ctx.AnswerCallback or an earlier internal answer), so route
+// handlers that forget to answer never leave the spinner running.
 func (e *Engine) answerCallback(ctx *Ctx) {
-	if ctx.Update.CallbackQuery == nil {
+	if ctx.Update.CallbackQuery == nil || ctx.callbackAnswered || ctx.client == nil {
 		return
 	}
+
+	ctx.callbackAnswered = true
 
 	go func() {
 		_, err := ctx.client.AnswerCallbackQuery().
@@ -846,6 +968,13 @@ const maxStateSwitchDepth = 8
 // switchState persists the new state (and its payload, when a
 // StateDataRepository is configured) and re-enters processing for the target
 // state's menu.
+//
+// Write order matters: the payload is encoded and stored BEFORE the state
+// name is published, so a failure at any step never leaves the user in the
+// new state with a missing payload. When the transition crosses states, the
+// previous state's payload is deleted afterwards — a payload lives exactly
+// as long as the user continuously occupies its state, so re-entering a
+// state later can never resurrect stale data.
 func (e *Engine) switchState(ctx *Ctx, state string, data any) error {
 	if ctx.switchDepth >= maxStateSwitchDepth {
 		return fmt.Errorf("state_switch_depth_exceeded: %s", state)
@@ -858,22 +987,30 @@ func (e *Engine) switchState(ctx *Ctx, state string, data any) error {
 
 	userID := ctx.UserID()
 
+	repo := e.getStateDataRepository()
+
+	var raw []byte
+
+	if data != nil && repo != nil {
+		encoded, err := json.Marshal(data)
+		if err != nil {
+			return fmt.Errorf("state_data_encode: %s: %w", state, err)
+		}
+
+		raw = encoded
+	}
+
+	if raw != nil {
+		if err := repo.SetUserStateData(userID, state, raw); err != nil {
+			return fmt.Errorf("state_data_store: %s: %w", state, err)
+		}
+	}
+
 	if err := e.userRepository.SetUserState(userID, state); err != nil {
 		return fmt.Errorf("error_setting_user_state: %d, %w", userID, err)
 	}
 
-	if data != nil {
-		if repo := e.getStateDataRepository(); repo != nil {
-			raw, err := json.Marshal(data)
-			if err != nil {
-				return fmt.Errorf("state_data_encode: %s: %w", state, err)
-			}
-
-			if err := repo.SetUserStateData(userID, state, raw); err != nil {
-				return fmt.Errorf("state_data_store: %s: %w", state, err)
-			}
-		}
-	}
+	previousState := ctx.State
 
 	ctx.State = state
 	ctx.IsSwitched = true
@@ -883,6 +1020,14 @@ func (e *Engine) switchState(ctx *Ctx, state string, data any) error {
 	// they must not leak into the new state's.
 	ctx.condResults = nil
 	ctx.switchDepth++
+
+	if repo != nil && previousState != "" && previousState != state {
+		if err := repo.DeleteUserStateData(userID, previousState); err != nil {
+			// Payload hygiene, not transition correctness: report, don't fail.
+			e.onErr(ctx.Context(), ctx.client, ctx.Update,
+				fmt.Errorf("state_data_delete: %s: %w", previousState, err))
+		}
+	}
 
 	e.processStateMenu(ctx, runtime)
 
@@ -934,7 +1079,23 @@ func (e *Engine) userLanguage(userID int64) (*Language, error) {
 		if userLanguage != "" {
 			lang = languageConfig.languages.GetByTag(userLanguage)
 		}
+
+		if lang == nil {
+			// No choice yet, or a stored tag that is no longer configured:
+			// fall back to the default language.
+			lang = languageConfig.languages.Default()
+		}
 	}
 
 	return lang, nil
+}
+
+// reportPanic routes a recovered panic to the configured panic handler, or to
+// the error handler when none is set.
+func (e *Engine) reportPanic(reqCtx context.Context, client *tgbotapi.Bot, update tgbotapi.Update, r any) {
+	if panicHandler := e.getPanicHandler(); panicHandler != nil {
+		panicHandler(client, update, r, string(debug.Stack()))
+	} else {
+		e.onErr(reqCtx, client, update, fmt.Errorf("panic: %v\n%s", r, debug.Stack()))
+	}
 }

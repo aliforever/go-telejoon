@@ -3,8 +3,13 @@ package telejoon
 import "sync/atomic"
 
 // Cond is a reusable, memoized condition. A Cond is evaluated at most once
-// per request; the result is cached in the Ctx, preserving the old
-// defined-condition semantics without string names.
+// per keyboard render: the result is cached in the Ctx, so any number of
+// buttons sharing a condition evaluate it once. State switches and
+// post-handler re-renders clear the cache, because a handler may have
+// changed what the condition reads — a condition is re-evaluated once per
+// entered state, not once per request. For a deliberately unshared
+// predicate use If(fn); for an expensive check that must run at most once
+// per update regardless of switches, cache it yourself with a Key:
 //
 //	var IsAdmin = telejoon.DefineCond(func(ctx *telejoon.Ctx) bool {
 //		return ctx.GetOr(IsAdminKey, false)

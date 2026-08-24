@@ -320,15 +320,26 @@ func TestWhenUnlessVisibility(t *testing.T) {
 	}
 }
 
-func TestDuplicateButtonLabelIsError(t *testing.T) {
+func TestDuplicateButtonLabelSkippedNotFatal(t *testing.T) {
 	engine := New(NewMockUserRepository(), stateWelcome)
 
 	runtime := Menu(stateWelcome, S("hi")).
-		Buttons(Reply(S("Same"), S("1")), Reply(S("Same"), S("2"))).
+		Buttons(Reply(S("Same"), S("1")), Reply(S("Same"), S("2")), Reply(S("Other"), S("3"))).
 		compile()
 
-	if _, _, err := engine.renderReplyKeyboard(testCtx("hi"), runtime); err == nil {
-		t.Fatal("expected duplicate_button_label error, got nil")
+	// A duplicate visible label is skipped and reported, but must not brick
+	// the state: the rest of the keyboard still renders and dispatches.
+	markup, byLabel, err := engine.renderReplyKeyboard(testCtx("hi"), runtime)
+	if err != nil {
+		t.Fatalf("renderReplyKeyboard: %v", err)
+	}
+
+	if byLabel["Same"] == nil || byLabel["Other"] == nil {
+		t.Fatalf("dispatch map = %v, want first-wins for the duplicate plus the other button", byLabel)
+	}
+
+	if rows := replyRows(t, markup); !equalRows(rows, [][]string{{"Same"}, {"Other"}}) {
+		t.Fatalf("rows = %v, want the duplicate skipped", rows)
 	}
 }
 
@@ -760,7 +771,7 @@ func TestDefaultHandlerCatchesUnmatchedParts(t *testing.T) {
 
 func TestCrossLanguageLabelDispatch(t *testing.T) {
 	languages, err := NewLanguageBuilder(language.English).
-		RegisterTomlFormat([]string{"testdata/locale.en.toml", "testdata/locale.fa.toml"}).
+		AddTOML("testdata/locale.en.toml", "testdata/locale.fa.toml").
 		Build()
 	if err != nil {
 		t.Fatalf("build languages: %v", err)
@@ -883,7 +894,7 @@ func TestDuplicateRegistrationPanics(t *testing.T) {
 
 func TestLanguageFallsBackToDefaultTag(t *testing.T) {
 	langs, err := NewLanguageBuilder(language.English).
-		RegisterTomlFormat([]string{"testdata/locale.en.toml", "testdata/locale.fa.toml"}).
+		AddTOML("testdata/locale.en.toml", "testdata/locale.fa.toml").
 		Build()
 	if err != nil {
 		t.Fatalf("build languages: %v", err)

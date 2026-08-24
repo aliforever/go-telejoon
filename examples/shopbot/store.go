@@ -82,33 +82,12 @@ func placeOrder(userID int64, o order) {
 //
 // IMPORTANT: a GoToWith payload rides the transition request itself, but the
 // user's NEXT message (e.g. the checkout address) is a new update — the
-// payload is then reloaded from this repository. Without
-// engine.WithStateDataRepository, the follow-up handlers receive a zero D.
-// The engine encodes payloads as JSON.
-
-type memoryStateDataRepository struct {
-	data sync.Map // map[stateDataKey][]byte
-}
-
-type stateDataKey struct {
-	userID int64
-	state  string
-}
-
-func (r *memoryStateDataRepository) SetUserStateData(userID int64, state string, data []byte) error {
-	r.data.Store(stateDataKey{userID, state}, data)
-
-	return nil
-}
-
-func (r *memoryStateDataRepository) GetUserStateData(userID int64, state string) ([]byte, error) {
-	raw, _ := r.data.Load(stateDataKey{userID, state})
-	if raw == nil {
-		return nil, nil
-	}
-
-	return raw.([]byte), nil
-}
+// payload is then reloaded from the StateDataRepository registered with
+// engine.WithStateDataRepository. main.go uses the shipped in-memory
+// default (telejoon.NewDefaultStateDataRepository); a production bot would
+// implement the three-method interface (set/get/delete) over a database.
+// Payloads are JSON-encoded, and a state's payload is deleted when the user
+// leaves the state — it can never resurface stale on a later visit.
 
 // === Custom codec ===
 //

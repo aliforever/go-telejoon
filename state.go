@@ -1,14 +1,68 @@
 package telejoon
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+	"sync"
+)
 
 // StateDataRepository is an optional extension that persists state payloads
 // (carried by GoToWith transitions) alongside the state name, encoded as
-// JSON. Without it, payloads live in-process only: after a restart, menus
+// JSON. Without it, payloads live in-process only: they ride the switching
+// update itself, but the user's NEXT message rebuilds the Ctx and menus
 // receive the zero value of their D.
+//
+// A payload's lifetime is the user's continuous occupancy of its state:
+// switching to a different state deletes the previous state's payload via
+// DeleteUserStateData, so re-entering a state later never resurrects stale
+// data.
 type StateDataRepository interface {
 	SetUserStateData(userID int64, state string, data []byte) error
 	GetUserStateData(userID int64, state string) ([]byte, error)
+	DeleteUserStateData(userID int64, state string) error
+}
+
+// DefaultStateDataRepository is an in-memory StateDataRepository. It covers
+// the common single-process bot; use a database-backed implementation when
+// payloads must survive restarts or multiple bot instances.
+type DefaultStateDataRepository struct {
+	data sync.Map // map[stateDataKey][]byte
+}
+
+type stateDataKey struct {
+	userID int64
+	state  string
+}
+
+// NewDefaultStateDataRepository creates an in-memory state data repository.
+func NewDefaultStateDataRepository() *DefaultStateDataRepository {
+	return &DefaultStateDataRepository{}
+}
+
+func (r *DefaultStateDataRepository) SetUserStateData(userID int64, state string, data []byte) error {
+	r.data.Store(stateDataKey{userID, state}, data)
+
+	return nil
+}
+
+func (r *DefaultStateDataRepository) GetUserStateData(userID int64, state string) ([]byte, error) {
+	raw, _ := r.data.Load(stateDataKey{userID, state})
+	if raw == nil {
+		return nil, nil
+	}
+
+	stored, ok := raw.([]byte)
+	if !ok {
+		return nil, fmt.Errorf("state_data_type_mismatch: %s", state)
+	}
+
+	return stored, nil
+}
+
+func (r *DefaultStateDataRepository) DeleteUserStateData(userID int64, state string) error {
+	r.data.Delete(stateDataKey{userID, state})
+
+	return nil
 }
 
 func unmarshalStateData[D any](raw []byte, data *D) error {

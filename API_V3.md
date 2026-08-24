@@ -129,10 +129,16 @@ Handlers of a menu receive the resolved payload as `data *D`. Text builders
 and conditions (which are state-agnostic) read it via the package function
 `telejoon.StateData(ctx, Checkout)`.
 
-Payload persistence: implement `telejoon.StateDataRepository`
-(`SetUserStateData`/`GetUserStateData`, JSON-encoded) and register it with
-`engine.WithStateDataRepository(repo)`. Without it, payloads are in-process
-only and menus receive the zero `D` after a restart.
+Payload persistence: register a `telejoon.StateDataRepository`
+(`SetUserStateData`/`GetUserStateData`/`DeleteUserStateData`, JSON-encoded)
+with `engine.WithStateDataRepository(repo)` — the shipped
+`telejoon.NewDefaultStateDataRepository()` covers single-process bots.
+Without one, payloads ride the switching update only, and the user's NEXT
+message already sees the zero `D`. A payload lives exactly as long as the
+user continuously occupies its state: switching to a different state deletes
+the previous state's payload, so re-entering a state later never resurrects
+stale data. A payload that fails to load or decode aborts the update — it is
+never handed to handlers as a silent zero value.
 
 ### Context: `Ctx` and `Key[T]`
 
@@ -175,6 +181,21 @@ ctx.ReplyText(text)
 `LP` (localized with params), `D` (deferred), `K` (from a `Key[string]`),
 `F` (Sprintf composition).
 
+For localized messages you can also declare typed handles next to your
+states instead of scattering key strings:
+
+```go
+var Greet  = telejoon.NewMsg("Welcome.Greet")           // plain message
+var CoText = telejoon.NewMsgP[CheckoutParams]("Checkout.Text") // typed params
+
+telejoon.Menu(Welcome, Greet.T())
+CoText.T(CheckoutParams{ProductID: 3, Qty: 1}) // json field names = template vars
+```
+
+`engine.Validate()` checks every declared `NewMsg` key against the loaded
+locales at startup — a typo becomes a startup error instead of a raw key
+leaking into a chat.
+
 ### Conditions
 
 ```go
@@ -183,8 +204,11 @@ var IsAdmin = telejoon.DefineCond(func(ctx *telejoon.Ctx) bool {
 })
 ```
 
-A `Cond` is memoized: evaluated at most once per request, cached in the `Ctx`.
-Buttons take `.When(cond)`, `.Unless(cond)`, or `.If(fn)` (non-memoized).
+A `Cond` is memoized per keyboard render: any number of buttons sharing a
+condition evaluate it once per render. State switches and post-handler
+re-renders clear the cache, because a handler may have changed what the
+condition reads. Buttons take `.When(cond)`, `.Unless(cond)`, or `.If(fn)`
+(non-memoized).
 
 ### Buttons
 
@@ -196,9 +220,11 @@ Modifiers (shared by both families): `.When/.Unless/.If/.NewRow()/.Alone()/.Hook
 
 Reply-button presses are matched by rendered label (a Telegram limitation),
 but the keyboard is rendered once per request and dispatch uses the same
-labels; duplicate visible labels are an explicit error, and labels in *all*
-configured languages dispatch (so a mid-conversation language switch doesn't
-strand the user's keyboard).
+labels; a duplicate visible label is skipped and reported (never bricks the
+state), and labels in *all* configured languages dispatch (so a
+mid-conversation language switch doesn't strand the user's keyboard). When a
+state renders no visible buttons, the previous state's keyboard is
+explicitly removed.
 
 ### Menus
 
@@ -220,7 +246,28 @@ telejoon.InlineMenuFor(ref, text).
 `engine.Add(menus...)` compiles builders into immutable runtimes
 (registration errors panic — they are startup misconfigurations).
 `engine.Validate()` checks cross-references (default state, static button
-targets).
+targets) and declared message keys against the locales.
+
+### Middleware
+
+Engine middlewares (`engine.Use`) run exactly once per update, before any
+menu processing. A menu's middleware chain runs when the menu is *entered* —
+when the update is dispatched to it, and when it is rendered as the
+destination of a state switch — but **at most once per menu per update**: a
+route returning `Edit(sameMenu)` or a chained redirect never re-runs a
+chain.
+
+A switch from state A to state B therefore runs both chains: A's (it gated
+the incoming update) and B's (B is entered to be rendered — middleware that
+prepares data for B's text/keyboard belongs here). Two wrappers tune this:
+
+```go
+shared := telejoon.Once(loadProfile)         // once per update, across all menus
+menu.Use(telejoon.DispatchOnly(rateLimiter)) // skipped on switch-render passes
+```
+
+Route callbacks are answered automatically when the handler didn't answer
+itself — the client spinner never runs until timeout.
 
 ### Routes and codecs
 
@@ -246,9 +293,24 @@ Engine-global routes: `engine.Route("track", fn)` (bound with `Do` as usual).
 
 ### Languages
 
-`NewLanguageBuilder` / `NewLanguageConfig` / `WithChangeLanguageMenu` work as
-before; the change-language menu is registered automatically:
-`engine.WithLanguageConfig(cfg)`.
+```go
+languages, err := telejoon.NewLanguageBuilder(language.English). // default/fallback
+	AddTOML("locale.en.toml", "locale.fa.toml"). // or AddTOMLFS(embedFS, ...)
+	Build()
+
+cfg := telejoon.NewLanguageConfig(languages, repo). // nil repo → in-memory
+	WithChangeLanguageMenu(stateChooseLanguage, true). // typed state handle
+	WithReverseButtonOrderInRowForRTL()
+
+engine.WithLanguageConfig(cfg) // auto-registers the chooser menu
+```
+
+Text direction is auto-detected from each language's script (override with
+`WithRTL`). Duplicate language files and a missing default-language file are
+build errors; duplicate chooser labels are a startup panic. Keys missing
+from a language fall back to the default language, and users with no (or an
+unknown) stored language render the default language too. Switch language
+from any handler with `ctx.ChangeLanguage("fa")`.
 
 ### Group/channel updates and multiple processors
 
@@ -259,6 +321,10 @@ unchanged:
 multi := telejoon.NewMultiProcessor(engine, telejoon.NewGroupHandlers())
 telejoon.Start(ctx, client, multi)
 ```
+
+`Start` processes updates concurrently across chats, but serializes updates
+that share a chat, in arrival order: a user double-tapping a button can
+never race their own state transitions.
 
 ## Migrating from v2
 
@@ -284,3 +350,5 @@ telejoon.Start(ctx, client, multi)
 | `SetButtonFormation/SetMaxButtonPerRow` | `.Formation(...)` / `.MaxPerRow(...)` on the menu builder |
 | `panic("invalid Handler type")` at registration | compile error |
 | `no_handler_for_state` at runtime | `engine.Validate()` at startup |
+| `NewLanguageBuilder(tag, rtlTags...).RegisterTomlFormat([]string{...})` | `NewLanguageBuilder(tag).AddTOML(paths...)` (RTL auto-detected) |
+| `WithChangeLanguageMenu("ChooseLanguage", force)` | `WithChangeLanguageMenu(stateChooseLanguage, force)` (typed handle) |

@@ -28,10 +28,9 @@ var (
 	stateBroadcast  = telejoon.NewState[telejoon.NoData]("Broadcast")
 	stateOrderReady = telejoon.NewState[telejoon.NoData]("OrderReady")
 
-	// stateChooseLanguage addresses the menu the engine auto-registers for
-	// WithChangeLanguageMenu("ChooseLanguage", true). The string must match
-	// exactly; never register your own menu under the same name (engine.Add
-	// panics on duplicates).
+	// The change-language menu is auto-registered by the engine under this
+	// handle (see WithChangeLanguageMenu in main.go); never register your own
+	// menu under the same name (engine.Add panics on duplicates).
 	stateChooseLanguage = telejoon.NewState[telejoon.NoData]("ChooseLanguage")
 )
 

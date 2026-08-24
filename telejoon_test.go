@@ -20,6 +20,8 @@ var (
 	stateWelcome = telejoon.NewState[telejoon.NoData]("Welcome")
 	stateInfo    = telejoon.NewState[telejoon.NoData]("Info")
 
+	stateChangeLanguage = telejoon.NewState[telejoon.NoData]("ChangeLanguage")
+
 	menuInfo   = telejoon.NewInlineMenuRef("Info")
 	menuInfo2  = telejoon.NewInlineMenuRef("Info2")
 	menuCustom = telejoon.NewInlineMenuRef("CustomInline")
@@ -47,16 +49,16 @@ func TestStart(t *testing.T) {
 	}
 
 	languages, err := telejoon.NewLanguageBuilder(language.English).
-		RegisterTomlFormat([]string{
+		AddTOML(
 			`C:\golang\src\github.com\aliforever\go-telejoon\locale.en.toml`,
 			`C:\golang\src\github.com\aliforever\go-telejoon\locale.fa.toml`,
-		}).Build()
+		).Build()
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	languageConfig := telejoon.NewLanguageConfig(languages, telejoon.NewDefaultUserLanguageRepository()).
-		WithChangeLanguageMenu("ChangeLanguage", true)
+		WithChangeLanguageMenu(stateChangeLanguage, true)
 
 	info := telejoon.InlineMenuFor(menuInfo, telejoon.S("Info Inline Menu"))
 
@@ -94,7 +96,7 @@ func TestStart(t *testing.T) {
 		Add(
 			telejoon.Menu(stateWelcome, telejoon.L("Welcome.Main")).
 				Buttons(
-					telejoon.GoTo(telejoon.L("Welcome.ChangeLanguageBtn"), telejoon.NewState[telejoon.NoData]("ChangeLanguage")),
+					telejoon.GoTo(telejoon.L("Welcome.ChangeLanguageBtn"), stateChangeLanguage),
 					telejoon.Reply(telejoon.S("Hello"), telejoon.S("You said Hello")),
 					telejoon.GoTo(telejoon.S("Info State"), stateInfo),
 					telejoon.ShowInline(telejoon.S("Info"), menuInfo),

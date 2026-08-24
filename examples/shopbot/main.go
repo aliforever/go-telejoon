@@ -42,9 +42,13 @@ func main() {
 	logger := logrus.New()
 
 	// === Languages (en + fa/RTL) ===
+	//
+	// The default language is the fallback for missing translations and for
+	// users who have not chosen a language. RTL is auto-detected from each
+	// language's script (Persian here); WithRTL overrides the detection.
 
-	languages, err := telejoon.NewLanguageBuilder(language.English, language.Persian).
-		RegisterTomlFormat(localePaths()).
+	languages, err := telejoon.NewLanguageBuilder(language.English).
+		AddTOML(localePaths()...).
 		Build()
 	if err != nil {
 		logger.Fatal("build languages: ", err)
@@ -52,8 +56,9 @@ func main() {
 
 	languageConfig := telejoon.NewLanguageConfig(languages, telejoon.NewDefaultUserLanguageRepository()).
 		// Force-choose: brand-new users pick a language before anything else,
-		// then land on the default state. The menu is auto-registered.
-		WithChangeLanguageMenu("ChooseLanguage", true).
+		// then land on the default state. The menu is auto-registered under
+		// the given state handle — no stringly-typed name to keep in sync.
+		WithChangeLanguageMenu(stateChooseLanguage, true).
 		WithReverseButtonOrderInRowForRTL()
 
 	// === Engine ===
@@ -66,16 +71,17 @@ func main() {
 	botEngine = telejoon.New(telejoon.NewDefaultUserRepository(), stateWelcome, options).
 		WithLanguageConfig(languageConfig).
 		// Required for GoToWith payloads to survive to the user's NEXT
-		// message (e.g. the checkout address). See store.go.
-		WithStateDataRepository(&memoryStateDataRepository{}).
+		// message (e.g. the checkout address). The default repository is
+		// in-memory; plug in a database-backed one for production.
+		WithStateDataRepository(telejoon.NewDefaultStateDataRepository()).
 		WithPanicHandler(func(client *tgbotapi.Bot, update tgbotapi.Update, err any, trace string) {
 			// Panics are recovered per update; the bot stays up.
 			logger.Errorf("panic: %v\n%s", err, trace)
 		}).
-		// Engine middlewares run for every private update, in order,
-		// BEFORE menu middlewares. Two caveats: the forced first-time
-		// language selection redirects before engine middlewares run, and
-		// state payloads are not loaded yet at this point — don't read
+		// Engine middlewares run exactly once per private update, in order,
+		// BEFORE any menu middleware — including for the very first update of
+		// a brand-new user, before the forced language-chooser redirect.
+		// State payloads are not loaded yet at this point — don't read
 		// StateData here.
 		Use(requestLogger).
 		Use(cancelCommand)
@@ -100,8 +106,9 @@ func main() {
 	)
 
 	// Validate catches broken static cross-references (GoTo/ShowInline/
-	// OpenMenu/StateBtn targets) at startup. ButtonsFunc output is
-	// per-request and cannot be validated here.
+	// OpenMenu/StateBtn targets) and declared message keys (NewMsg) missing
+	// from the locales at startup. ButtonsFunc output is per-request and
+	// cannot be validated here.
 	if err := botEngine.Validate(); err != nil {
 		logger.Fatal("validate: ", err)
 	}

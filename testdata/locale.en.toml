@@ -1,2 +1,3 @@
 Greeting = "Hello"
 OnlyEnglish = "Only English"
+WelcomeUser = "Hello {{.Name}}"

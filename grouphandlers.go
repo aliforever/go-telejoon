@@ -70,22 +70,23 @@ func (e *EngineWithGroupHandlers) canProcess(update tgbotapi.Update) bool {
 }
 
 func (e *EngineWithGroupHandlers) Process(ctx context.Context, client *tgbotapi.Bot, update tgbotapi.Update) {
+	e.m.RLock()
+	middlewares := append([]GroupMiddleware(nil), e.middlewares...)
+	handlers := append([]GroupUpdateHandler(nil), e.handlers...)
+	panicHandler := e.panicHandler
+	e.m.RUnlock()
+
 	// Always recover: each update runs in its own goroutine, so an
 	// unrecovered panic would take down the whole process.
 	defer func() {
 		if r := recover(); r != nil {
-			if e.panicHandler != nil {
-				e.panicHandler(client, update, r, string(debug.Stack()))
+			if panicHandler != nil {
+				panicHandler(client, update, r, string(debug.Stack()))
 			} else {
 				e.onErr(ctx, client, update, fmt.Errorf("panic: %v\n%s", r, debug.Stack()))
 			}
 		}
 	}()
-
-	e.m.RLock()
-	middlewares := e.middlewares
-	handlers := e.handlers
-	e.m.RUnlock()
 
 	// Run middlewares
 	for _, mw := range middlewares {
@@ -167,22 +168,23 @@ func (e *EngineWithChannelHandlers) canProcess(update tgbotapi.Update) bool {
 }
 
 func (e *EngineWithChannelHandlers) Process(ctx context.Context, client *tgbotapi.Bot, update tgbotapi.Update) {
+	e.m.RLock()
+	middlewares := append([]ChannelMiddleware(nil), e.middlewares...)
+	handlers := append([]ChannelUpdateHandler(nil), e.handlers...)
+	panicHandler := e.panicHandler
+	e.m.RUnlock()
+
 	// Always recover: each update runs in its own goroutine, so an
 	// unrecovered panic would take down the whole process.
 	defer func() {
 		if r := recover(); r != nil {
-			if e.panicHandler != nil {
-				e.panicHandler(client, update, r, string(debug.Stack()))
+			if panicHandler != nil {
+				panicHandler(client, update, r, string(debug.Stack()))
 			} else {
 				e.onErr(ctx, client, update, fmt.Errorf("panic: %v\n%s", r, debug.Stack()))
 			}
 		}
 	}()
-
-	e.m.RLock()
-	middlewares := e.middlewares
-	handlers := e.handlers
-	e.m.RUnlock()
 
 	// Run middlewares
 	for _, mw := range middlewares {

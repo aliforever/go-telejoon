@@ -255,7 +255,7 @@ func (b *MenuBuilder[D]) compile() *menuRuntime {
 		staticButtons: b.buttons,
 	}
 
-	runtime.loadData = func(ctx *Ctx) any {
+	runtime.loadData = func(ctx *Ctx) (any, error) {
 		// A GoToWith transition during this request carries the payload
 		// directly; the types match by construction. The payload is copied so
 		// handlers never share a *D across users or requests.
@@ -266,31 +266,28 @@ func (b *MenuBuilder[D]) compile() *menuRuntime {
 			if data, ok := pending.(*D); ok {
 				copied := *data
 
-				return &copied
+				return &copied, nil
 			}
 
-			ctx.engine.onErr(ctx.Context(), ctx.client, ctx.Update,
-				fmt.Errorf("state_data_type_mismatch: %s", b.state.name))
+			return nil, fmt.Errorf("state_data_type_mismatch: %s", b.state.name)
 		}
 
 		data := new(D)
 
 		if repo := ctx.engine.getStateDataRepository(); repo != nil {
 			raw, err := repo.GetUserStateData(ctx.UserID(), b.state.name)
+			if err != nil {
+				return nil, fmt.Errorf("state_data_load: %s: %w", b.state.name, err)
+			}
 
-			switch {
-			case err != nil:
-				ctx.engine.onErr(ctx.Context(), ctx.client, ctx.Update,
-					fmt.Errorf("state_data_load: %s: %w", b.state.name, err))
-			case len(raw) > 0:
+			if len(raw) > 0 {
 				if err := unmarshalStateData(raw, data); err != nil {
-					ctx.engine.onErr(ctx.Context(), ctx.client, ctx.Update,
-						fmt.Errorf("state_data_decode: %s: %w", b.state.name, err))
+					return nil, fmt.Errorf("state_data_decode: %s: %w", b.state.name, err)
 				}
 			}
 		}
 
-		return data
+		return data, nil
 	}
 
 	runtime.keyboard = func(ctx *Ctx) ([]*Button, error) {

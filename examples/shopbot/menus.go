@@ -8,6 +8,27 @@ import (
 	"github.com/aliforever/go-telejoon"
 )
 
+// === Typed message handles ===
+//
+// NewMsg/NewMsgP declare localized messages as package variables instead of
+// scattering key strings: one place to rename a key, and engine.Validate
+// checks declared NewMsg keys against the locales at startup. MsgP's type
+// parameter is the params struct — its JSON field names are the template
+// variable names, so a template and its data cannot drift apart.
+
+var welcomeMain = telejoon.NewMsgP[welcomeParams]("Welcome.Main")
+
+type welcomeParams struct {
+	Name string `json:"Name"` // {{.Name}} in the locale files
+}
+
+var checkoutPrompt = telejoon.NewMsgP[checkoutParams]("Checkout.Text")
+
+type checkoutParams struct {
+	ProductID int64 `json:"ProductID"`
+	Qty       int   `json:"Qty"`
+}
+
 // === Welcome ===
 //
 // The home menu: static buttons of every kind, a memoized condition, a
@@ -32,8 +53,8 @@ func welcomeMenu() *telejoon.MenuBuilder[telejoon.NoData] {
 			// The change-language menu is auto-registered by the engine;
 			// address it by a handle with the same string name.
 			telejoon.GoTo(telejoon.S("🌐 Language"), stateChooseLanguage),
-			// When: the memoized isAdmin cond is evaluated once per request,
-			// no matter how many buttons use it. Alone: own keyboard row.
+			// When: the memoized isAdmin cond is evaluated once per keyboard
+			// render, no matter how many buttons use it. Alone: own row.
 			telejoon.GoTo(telejoon.L("Welcome.Admin"), stateAdmin).When(isAdmin).Alone(),
 			// Raw renders like any button but has no action: the press falls
 			// through to OnText (matched by its rendered label below).
@@ -52,16 +73,9 @@ func welcomeText(ctx *telejoon.Ctx) string {
 		name = ctx.FirstName()
 	}
 
-	if lang := ctx.Language(); lang != nil {
-		// LP-style localization with per-request template params. Missing
-		// translations fall back to the default language; a key missing
-		// everywhere renders as the key itself — never a panic.
-		if text, _ := lang.GetWithParams("Welcome.Main", map[string]interface{}{"Name": name}); text != "" {
-			return text
-		}
-	}
-
-	return "Welcome, " + name + "!"
+	// Typed params: missing translations fall back to the default language;
+	// a key missing everywhere renders as the key itself — never a panic.
+	return welcomeMain.T(welcomeParams{Name: name})(ctx)
 }
 
 func welcomeOnText(ctx *telejoon.Ctx, _ *telejoon.NoData, text string) telejoon.Action {
@@ -219,16 +233,7 @@ func checkoutText(ctx *telejoon.Ctx) string {
 		return "checkout"
 	}
 
-	if lang := ctx.Language(); lang != nil {
-		if text, _ := lang.GetWithParams("Checkout.Text", map[string]interface{}{
-			"ProductID": data.ProductID,
-			"Qty":       data.Qty,
-		}); text != "" {
-			return text
-		}
-	}
-
-	return fmt.Sprintf("Checking out product #%d (qty %d). Send your address:", data.ProductID, data.Qty)
+	return checkoutPrompt.T(checkoutParams{ProductID: data.ProductID, Qty: data.Qty})(ctx)
 }
 
 // === Support ===

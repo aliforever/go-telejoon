@@ -62,6 +62,18 @@ type Ctx struct {
 
 	condResults map[uint64]bool
 
+	// enteredMenus tracks which menu middleware chains have completed for
+	// this update ("s:<state>" / "i:<menu>"), so a menu's chain runs at most
+	// once per update even when the menu is re-entered.
+	enteredMenus map[string]struct{}
+
+	// ranOnce tracks Once-wrapped middlewares that already ran this update.
+	ranOnce map[uint64]struct{}
+
+	// callbackAnswered reports whether the callback query of this update has
+	// been answered; unanswered callbacks get a no-op answer after dispatch.
+	callbackAnswered bool
+
 	// userID is set when the Ctx is built without an update carrying a
 	// sender (e.g. SwitchUserState), and takes precedence in UserID/ChatID.
 	userID int64
@@ -143,15 +155,65 @@ func (c *Ctx) Context() context.Context {
 	return c.reqCtx
 }
 
-// Language returns the user's resolved language, or nil when languages are
-// not configured or the user has not chosen one yet.
+// Language returns the user's chosen language, or nil when languages are
+// not configured or the user has not chosen one yet. Texts (L, LP, Msg)
+// resolve nil to the configured default language automatically.
 func (c *Ctx) Language() *Language {
 	return c.language
+}
+
+// resolveLanguage returns the request's language, falling back to the
+// configured default language so users without a chosen language still get
+// localized texts. It returns nil when languages are not configured at all.
+func (c *Ctx) resolveLanguage() *Language {
+	if c.language != nil {
+		return c.language
+	}
+
+	if c.engine != nil {
+		if cfg := c.engine.getLanguageConfig(); cfg != nil && cfg.languages != nil {
+			return cfg.languages.Default()
+		}
+	}
+
+	return nil
 }
 
 // SetLanguage overrides the language for this request.
 func (c *Ctx) SetLanguage(language *Language) {
 	c.language = language
+}
+
+// ChangeLanguage validates tag against the configured languages, persists it
+// as the user's language, and applies it to this request — the one-call way
+// to switch language from a handler:
+//
+//	if err := ctx.ChangeLanguage("fa"); err != nil {
+//		return telejoon.Error(err)
+//	}
+//	return ctx.GoTo(Welcome)
+func (c *Ctx) ChangeLanguage(tag string) error {
+	if c.engine == nil {
+		return fmt.Errorf("change_language: no engine in context")
+	}
+
+	cfg := c.engine.getLanguageConfig()
+	if cfg == nil || cfg.languages == nil {
+		return fmt.Errorf("change_language: languages not configured")
+	}
+
+	lang := cfg.languages.GetByTag(tag)
+	if lang == nil {
+		return fmt.Errorf("change_language: unknown language %q", tag)
+	}
+
+	if err := cfg.repo.SetUserLanguage(c.UserID(), lang.tag); err != nil {
+		return fmt.Errorf("change_language: %w", err)
+	}
+
+	c.language = lang
+
+	return nil
 }
 
 // === Transitions and responses ===
@@ -193,6 +255,8 @@ func (c *Ctx) AnswerCallback(text string, showAlert bool) Action {
 	if err != nil {
 		return Error(fmt.Errorf("answer_callback: %w", err))
 	}
+
+	c.callbackAnswered = true
 
 	return Stop()
 }

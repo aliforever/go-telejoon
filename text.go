@@ -15,11 +15,12 @@ func S(text string) Text {
 }
 
 // L returns a text localized by the given message key.
-// Falls back to the key itself when no language is available or the key is
-// not translated, instead of panicking.
+// Falls back to the key itself when languages are not configured or the key
+// is not translated; users without a chosen language get the default
+// language.
 func L(key string) Text {
 	return func(ctx *Ctx) string {
-		if lang := ctx.Language(); lang != nil {
+		if lang := ctx.resolveLanguage(); lang != nil {
 			if text, _ := lang.Get(key); text != "" {
 				return text
 			}
@@ -30,9 +31,10 @@ func L(key string) Text {
 }
 
 // LP returns a text localized by the given message key with template params.
+// Prefer a declared MsgP handle when the params are known at compile time.
 func LP(key string, params map[string]interface{}) Text {
 	return func(ctx *Ctx) string {
-		if lang := ctx.Language(); lang != nil {
+		if lang := ctx.resolveLanguage(); lang != nil {
 			if text, _ := lang.GetWithParams(key, params); text != "" {
 				return text
 			}

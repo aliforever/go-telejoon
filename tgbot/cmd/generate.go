@@ -426,10 +426,10 @@ func main() {
 	repo := db.NewRepository(mongoClient.Database(cfg.Mongo.Name), redisClient)
 
 	languages, err := telejoon.NewLanguageBuilder(language.English).
-		RegisterTomlFormat([]string{
+		AddTOML(
 			"locale.en.toml",
 			"locale.fa.toml",
-		}).Build()
+		).Build()
 	if err != nil {
 		logger.Error(
 			"Failed to build languages",
@@ -828,7 +828,7 @@ func NewBot(
 	logger *slog.Logger,
 ) *Bot {
 	languageConfig := telejoon.NewLanguageConfig(languages, repository).
-		WithChangeLanguageMenu("ChooseLanguage", true)
+		WithChangeLanguageMenu(stateChooseLanguage, true)
 
 	return &Bot{
 		api:            api,

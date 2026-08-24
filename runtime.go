@@ -26,8 +26,10 @@ type menuRuntime struct {
 	// keyboard resolves the visible buttons for the request.
 	keyboard func(ctx *Ctx) ([]*Button, error)
 
-	// loadData resolves the state payload for the request, as a *D.
-	loadData func(ctx *Ctx) any
+	// loadData resolves the state payload for the request, as a *D. A
+	// non-nil error aborts processing of the update: handlers must never
+	// receive a silent zero payload after a repository or decode failure.
+	loadData func(ctx *Ctx) (any, error)
 
 	onText    func(ctx *Ctx) Action
 	onDefault func(ctx *Ctx) Action
@@ -61,8 +63,11 @@ type inlineMenuRuntime struct {
 
 // renderReplyKeyboard renders the reply keyboard once per request and returns
 // the markup together with the label→button dispatch map. Dispatching through
-// the same labels that were rendered keeps rendering and dispatch consistent;
-// duplicate visible labels in the user's language are an explicit error.
+// the same labels that were rendered keeps rendering and dispatch consistent.
+//
+// A duplicate visible label in the user's language is ambiguous to dispatch:
+// the button is skipped and reported, but the rest of the keyboard still
+// renders and dispatches — one bad button must not brick the whole state.
 //
 // The dispatch map additionally contains the labels rendered in every other
 // configured language, so a user who switched language mid-state still
@@ -91,21 +96,37 @@ func (e *Engine) renderReplyKeyboard(
 
 	byLabel := map[string]*Button{}
 
+	// Labels are rendered once per button and reused for both the dispatch
+	// map and the markup.
+	var kept []*Button
+	var labels []string
+
 	for _, button := range visible {
 		label := button.label(ctx)
 		if _, duplicate := byLabel[label]; duplicate {
-			return nil, nil, fmt.Errorf("duplicate_button_label: %q in state %s", label, runtime.state)
+			e.onErr(ctx.Context(), ctx.client, ctx.Update,
+				fmt.Errorf("duplicate_button_label: %q in state %s", label, runtime.state))
+
+			continue
 		}
 
 		byLabel[label] = button
+		kept = append(kept, button)
+		labels = append(labels, label)
 	}
+
+	if len(kept) == 0 {
+		return nil, byLabel, nil
+	}
+
+	languageConfig := e.getLanguageConfig()
 
 	// Labels in the other configured languages, for cross-language dispatch.
 	// Conflicts across languages are resolved first-come; two languages may
 	// legitimately translate distinct buttons identically.
-	if e.languageConfig != nil && len(e.languageConfig.languages.localizers) > 1 {
-		for i := range e.languageConfig.languages.localizers {
-			lang := e.languageConfig.languages.localizers[i]
+	if languageConfig != nil && len(languageConfig.languages.localizers) > 1 {
+		for i := range languageConfig.languages.localizers {
+			lang := languageConfig.languages.localizers[i]
 
 			if ctx.language != nil && lang.tag == ctx.language.tag {
 				continue
@@ -114,7 +135,7 @@ func (e *Engine) renderReplyKeyboard(
 			clone := *ctx
 			clone.language = &lang
 
-			for _, button := range visible {
+			for _, button := range kept {
 				label := button.label(&clone)
 				if _, exists := byLabel[label]; !exists {
 					byLabel[label] = button
@@ -123,25 +144,25 @@ func (e *Engine) renderReplyKeyboard(
 		}
 	}
 
-	var labels []string
+	var rowLabels []string
 
-	for _, button := range visible {
+	for i, button := range kept {
 		if button.breakBefore {
-			labels = append(labels, "")
+			rowLabels = append(rowLabels, "")
 		}
 
-		labels = append(labels, button.label(ctx))
+		rowLabels = append(rowLabels, labels[i])
 
 		if button.breakAfter {
-			labels = append(labels, "")
+			rowLabels = append(rowLabels, "")
 		}
 	}
 
 	reverse := ctx.language != nil && ctx.language.rtl &&
-		e.languageConfig != nil && e.languageConfig.reverseButtonOrderInRowForRTL
+		languageConfig != nil && languageConfig.reverseButtonOrderInRowForRTL
 
 	markup := tools.Keyboards{}.NewReplyKeyboardFromSlicesOfStrings(
-		chunkIntoRows(labels, isEmptyString, runtime.maxPerRow, runtime.formation, reverse),
+		chunkIntoRows(rowLabels, isEmptyString, runtime.maxPerRow, runtime.formation, reverse),
 	)
 
 	return markup, byLabel, nil
@@ -259,8 +280,10 @@ func (e *Engine) buildInlineMarkup(
 		return nil, firstErr
 	}
 
-	reverse := ctx.language != nil && ctx.language.rtl &&
-		e.languageConfig != nil && e.languageConfig.reverseButtonOrderInRowForRTL
+	reverse := false
+	if cfg := e.getLanguageConfig(); cfg != nil && ctx.language != nil {
+		reverse = ctx.language.rtl && cfg.reverseButtonOrderInRowForRTL
+	}
 
 	return tools.Keyboards{}.NewInlineKeyboardFromSlicesOfMaps(
 		chunkIntoRows(rows, isNilRow, runtime.maxPerRow, runtime.formation, reverse),
