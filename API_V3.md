@@ -336,7 +336,10 @@ telejoon.Start(ctx, client, multi)
 
 `Start` processes updates concurrently across chats, but serializes updates
 that share a chat, in arrival order: a user double-tapping a button can
-never race their own state transitions.
+never race their own state transitions. This guarantee lives in `Start`, the
+supported polling loop — if you ever hand-roll a loop over
+`client.Updates`, serialize per chat yourself (or better: don't, use
+`Start`; `StartWithShutdownTimeout` exists for bounded drains).
 
 ## Migrating from v2
 
