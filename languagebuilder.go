@@ -1,6 +1,7 @@
 package telejoon
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 
@@ -88,6 +89,29 @@ func (l *Language) Get(id string) (string, error) {
 	return l.localizer.Localize(&i18n.LocalizeConfig{
 		MessageID: id,
 	})
+}
+
+// GetOwn returns the localized string for id only when THIS language
+// translates it; the default-language fallback does not count. It reports
+// false when the key is missing here even if the default language has it —
+// use it where a fallback would be a lie, like the change-language menu's
+// per-language labels.
+func (l *Language) GetOwn(id string) (string, bool) {
+	text, err := l.Get(id)
+	if err != nil {
+		var notFound *i18n.MessageNotFoundErr
+		if errors.As(err, &notFound) {
+			return "", false
+		}
+		// Any other error (e.g. template execution) means the key exists in
+		// this language but failed to render; treat it as present.
+	}
+
+	if text == "" {
+		return "", false
+	}
+
+	return text, true
 }
 
 // MustGet returns the localized string for the given message ID.

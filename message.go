@@ -2,7 +2,11 @@ package telejoon
 
 import (
 	"encoding/json"
+	"errors"
+	"sort"
 	"sync"
+
+	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
 // Msg is a typed handle to a localized message without template params.
@@ -22,7 +26,7 @@ type Msg struct {
 
 // NewMsg declares a localized message handle for the given i18n message ID.
 func NewMsg(key string) Msg {
-	registerMsgKey(key)
+	registerMsgKey(key, false)
 
 	return Msg{key: key}
 }
@@ -57,6 +61,8 @@ type MsgP[P any] struct {
 
 // NewMsgP declares a localized message handle with typed template params.
 func NewMsgP[P any](key string) MsgP[P] {
+	registerMsgKey(key, true)
+
 	return MsgP[P]{key: key}
 }
 
@@ -98,27 +104,44 @@ func msgParamsToMap[P any](params P) map[string]interface{} {
 }
 
 // === Message key registry (for startup validation) ===
-
+//
+// The registry is process-global, like the handles themselves: every engine
+// validates every declared key against its own locales, so engines sharing a
+// process must share a catalog (the common case for a single bot).
 var msgRegistry = struct {
 	sync.Mutex
-	keys map[string]struct{}
-}{keys: map[string]struct{}{}}
+	keys map[string]bool // key -> takes template params
+}{keys: map[string]bool{}}
 
-func registerMsgKey(key string) {
+func registerMsgKey(key string, hasParams bool) {
 	msgRegistry.Lock()
 	defer msgRegistry.Unlock()
 
-	msgRegistry.keys[key] = struct{}{}
+	msgRegistry.keys[key] = hasParams
 }
 
-// validateMsgs reports declared message keys (NewMsg) that do not localize
-// with the default language. MsgP handles are excluded: their templates
-// require params, so they cannot be rendered for a check.
+// resetMsgRegistryForTest clears the registry. Tests only: a deliberately
+// missing key would otherwise poison later Validate runs in the package.
+func resetMsgRegistryForTest() {
+	msgRegistry.Lock()
+	defer msgRegistry.Unlock()
+
+	msgRegistry.keys = map[string]bool{}
+}
+
+// validateMsgs reports declared message keys (NewMsg/NewMsgP) that the
+// default language does not translate. A key whose template fails to render
+// without params counts as present — existence is what is validated.
 func (l *Languages) validateMsgs() []string {
 	msgRegistry.Lock()
-	keys := make([]string, 0, len(msgRegistry.keys))
-	for key := range msgRegistry.keys {
-		keys = append(keys, key)
+	type entry struct {
+		key       string
+		hasParams bool
+	}
+
+	entries := make([]entry, 0, len(msgRegistry.keys))
+	for key, hasParams := range msgRegistry.keys {
+		entries = append(entries, entry{key, hasParams})
 	}
 	msgRegistry.Unlock()
 
@@ -127,11 +150,22 @@ func (l *Languages) validateMsgs() []string {
 		return nil
 	}
 
+	sort.Slice(entries, func(i, j int) bool { return entries[i].key < entries[j].key })
+
 	var missing []string
 
-	for _, key := range keys {
-		if text, err := def.Get(key); err != nil || text == "" {
-			missing = append(missing, key)
+	for _, e := range entries {
+		var err error
+
+		if e.hasParams {
+			_, err = def.GetWithParams(e.key, map[string]interface{}{})
+		} else {
+			_, err = def.Get(e.key)
+		}
+
+		var notFound *i18n.MessageNotFoundErr
+		if errors.As(err, &notFound) {
+			missing = append(missing, e.key)
 		}
 	}
 

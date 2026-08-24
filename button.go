@@ -256,6 +256,11 @@ func OpenMenuEdit(label Text, menu InlineMenuRef) *InlineButton {
 
 // StateBtn creates an inline button that transitions the user to a
 // payload-less state.
+//
+// Security note: callback_data is client-controlled. A crafted callback can
+// invoke this transition (or any route) without the button ever being
+// rendered, so When/If visibility is NOT an authorization check — gate
+// privileged states with menu middleware, which runs on every entry.
 func StateBtn(label Text, state State[NoData]) *InlineButton {
 	button := newInlineButton(inlineKindState, label)
 	button.state = state.name

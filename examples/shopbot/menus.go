@@ -109,8 +109,11 @@ func welcomeOnText(ctx *telejoon.Ctx, _ *telejoon.NoData, text string) telejoon.
 	}
 
 	// Raw button press: compare against the RENDERED label — hardcoding the
-	// English string would break for users on another language.
-	if text == telejoon.L("General.Crash")(ctx) {
+	// English string would break for users on another language. The button is
+	// admin-only (When(isAdmin)), and the typed text must be gated the same
+	// way: callback_data and message texts are client-controlled, so button
+	// visibility alone is never an authorization check.
+	if isAdminUser(ctx.UserID()) && text == telejoon.L("General.Crash")(ctx) {
 		panic("boom — intentional demo panic via raw button")
 	}
 

@@ -144,10 +144,10 @@ func (e *Engine) WithLanguageConfig(cfg *LanguageConfig) *Engine {
 	text := ""
 
 	for _, lang := range cfg.languages.localizers {
-		// go-i18n returns fallback-language text together with an error, so
-		// only non-empty text counts as a translation.
-		translated, _ := lang.Get(fmt.Sprintf("%s.Text", cfg.changeLanguageState))
-		if translated == "" {
+		// Exact-language lookup: a language missing the chooser text must
+		// not contribute a duplicate copy of the default language's line.
+		translated, ok := lang.GetOwn(fmt.Sprintf("%s.Text", cfg.changeLanguageState))
+		if !ok {
 			continue
 		}
 
@@ -159,8 +159,11 @@ func (e *Engine) WithLanguageConfig(cfg *LanguageConfig) *Engine {
 	}
 
 	languageLabel := func(lang Language) string {
-		label, _ := lang.Get(fmt.Sprintf("%s.Button", cfg.changeLanguageState))
-		if label == "" {
+		// Exact-language lookup: a missing translation falls back to the
+		// language tag, never to the default language's label (which would
+		// also trip the duplicate-label check below).
+		label, ok := lang.GetOwn(fmt.Sprintf("%s.Button", cfg.changeLanguageState))
+		if !ok {
 			label = lang.tag
 		}
 
@@ -359,15 +362,8 @@ func (e *Engine) Process(reqCtx context.Context, client *tgbotapi.Bot, update tg
 		Update:  update,
 	}
 
-	from := update.From()
-	if from == nil {
-		j, _ := json.Marshal(update)
-		e.onErr(reqCtx, client, update, fmt.Errorf("update.From() is nil: %s", string(j)))
-
-		return
-	}
-
-	ctx.userID = from.Id
+	// processUserState already rejected a nil From.
+	ctx.userID = update.From().Id
 
 	var lang *Language
 
@@ -376,7 +372,7 @@ func (e *Engine) Process(reqCtx context.Context, client *tgbotapi.Bot, update tg
 	languageConfig := e.getLanguageConfig()
 
 	if languageConfig != nil {
-		userLanguage, err := languageConfig.repo.GetUserLanguage(from.Id)
+		userLanguage, err := languageConfig.repo.GetUserLanguage(ctx.userID)
 
 		switch {
 		case err == nil:
@@ -409,7 +405,10 @@ func (e *Engine) Process(reqCtx context.Context, client *tgbotapi.Bot, update tg
 		return
 	}
 
-	if forceChoose {
+	// A global middleware may have assigned a language itself
+	// (ctx.ChangeLanguage / SetLanguage); only redirect users still without
+	// one.
+	if forceChoose && ctx.language == nil {
 		if update.CallbackQuery != nil {
 			e.answerCallback(ctx)
 		}
@@ -469,12 +468,19 @@ func (e *Engine) SwitchUserState(
 		return err
 	}
 
+	// Resolve the user's CURRENT state so switchState sees the real
+	// transition source (and deletes its leftover payload).
+	currentState, err := e.userRepository.GetUserState(userID)
+	if err != nil && !errors.Is(err, UserStateNotFoundErr) {
+		return fmt.Errorf("get_user_state: %w", err)
+	}
+
 	ctx := &Ctx{
 		client:     client,
 		engine:     e,
 		reqCtx:     reqCtx,
 		session:    &sync.Map{},
-		State:      state.name,
+		State:      currentState,
 		language:   lang,
 		IsSwitched: true,
 		userID:     userID,
@@ -568,31 +574,26 @@ func (e *Engine) runMiddlewares(ctx *Ctx, middlewares []Handler) bool {
 }
 
 // runMenuMiddlewares runs a menu's middleware chain at most once per update.
-// A menu can be entered several times while processing one update — a route
-// returning Edit(sameMenu), or a chained state switch re-entering a menu —
-// and re-running its chain would duplicate side effects (database loads,
-// rate limiting, logging). The chain is marked only when it completed; a
-// chain that stopped processing does not suppress a later entry's chain.
+// The menu is marked as entered BEFORE the chain runs: a chain that stops
+// processing (Stop, or a transition like a middleware redirect) must not
+// re-run when the update re-enters the menu — "at most once per menu per
+// update" holds whether the chain completed or not.
 func (e *Engine) runMenuMiddlewares(ctx *Ctx, key string, middlewares []Handler) bool {
 	if len(middlewares) == 0 {
 		return true
-	}
-
-	if _, ok := ctx.enteredMenus[key]; ok {
-		return true
-	}
-
-	if !e.runMiddlewares(ctx, middlewares) {
-		return false
 	}
 
 	if ctx.enteredMenus == nil {
 		ctx.enteredMenus = map[string]struct{}{}
 	}
 
+	if _, ok := ctx.enteredMenus[key]; ok {
+		return true
+	}
+
 	ctx.enteredMenus[key] = struct{}{}
 
-	return true
+	return e.runMiddlewares(ctx, middlewares)
 }
 
 // processAction executes a non-control-flow action result.
@@ -942,7 +943,9 @@ func (e *Engine) processInlineMenu(ctx *Ctx, name string, edit bool) error {
 // answerCallback fires a no-op answer to the current callback query, stopping
 // the client's loading spinner. It is a no-op when the query was already
 // answered (via ctx.AnswerCallback or an earlier internal answer), so route
-// handlers that forget to answer never leave the spinner running.
+// handlers that forget to answer never leave the spinner running. It is
+// synchronous: an untracked goroutine could be dropped mid-flight during
+// shutdown.
 func (e *Engine) answerCallback(ctx *Ctx) {
 	if ctx.Update.CallbackQuery == nil || ctx.callbackAnswered || ctx.client == nil {
 		return
@@ -950,15 +953,13 @@ func (e *Engine) answerCallback(ctx *Ctx) {
 
 	ctx.callbackAnswered = true
 
-	go func() {
-		_, err := ctx.client.AnswerCallbackQuery().
-			CallbackQueryID(ctx.Update.CallbackQuery.Id).
-			ShowAlert(false).
-			Send(ctx.Context())
-		if err != nil {
-			e.onErr(ctx.Context(), ctx.client, ctx.Update, err)
-		}
-	}()
+	_, err := ctx.client.AnswerCallbackQuery().
+		CallbackQueryID(ctx.Update.CallbackQuery.Id).
+		ShowAlert(false).
+		Send(ctx.Context())
+	if err != nil {
+		e.onErr(ctx.Context(), ctx.client, ctx.Update, err)
+	}
 }
 
 // maxStateSwitchDepth bounds chained state transitions within one request, so
@@ -969,12 +970,13 @@ const maxStateSwitchDepth = 8
 // StateDataRepository is configured) and re-enters processing for the target
 // state's menu.
 //
-// Write order matters: the payload is encoded and stored BEFORE the state
-// name is published, so a failure at any step never leaves the user in the
-// new state with a missing payload. When the transition crosses states, the
-// previous state's payload is deleted afterwards — a payload lives exactly
-// as long as the user continuously occupies its state, so re-entering a
-// state later can never resurrect stale data.
+// A payload lives exactly as long as the user continuously occupies its
+// state. To enforce that, the write order is: encode and store the payload
+// (or clear the target's leftover payload on a payload-less cross-state
+// entry), publish the state name, then delete the previous state's payload.
+// A stored payload is rolled back when publishing fails, so a failure at
+// any step leaves neither a user stuck in a state without its payload nor
+// an orphaned payload waiting to resurface.
 func (e *Engine) switchState(ctx *Ctx, state string, data any) error {
 	if ctx.switchDepth >= maxStateSwitchDepth {
 		return fmt.Errorf("state_switch_depth_exceeded: %s", state)
@@ -986,6 +988,9 @@ func (e *Engine) switchState(ctx *Ctx, state string, data any) error {
 	}
 
 	userID := ctx.UserID()
+
+	previousState := ctx.State
+	crossState := previousState != "" && previousState != state
 
 	repo := e.getStateDataRepository()
 
@@ -1000,17 +1005,34 @@ func (e *Engine) switchState(ctx *Ctx, state string, data any) error {
 		raw = encoded
 	}
 
-	if raw != nil {
-		if err := repo.SetUserStateData(userID, state, raw); err != nil {
-			return fmt.Errorf("state_data_store: %s: %w", state, err)
+	if repo != nil {
+		if raw != nil {
+			if err := repo.SetUserStateData(userID, state, raw); err != nil {
+				return fmt.Errorf("state_data_store: %s: %w", state, err)
+			}
+		} else if crossState {
+			// A payload-less entry into a different state must never
+			// resurrect data an earlier failed transition left behind:
+			// clear the target first. Failure aborts the transition —
+			// handlers must not see stale payloads. (Same-state re-entry
+			// keeps the payload: that is the re-render pattern.)
+			if err := repo.DeleteUserStateData(userID, state); err != nil {
+				return fmt.Errorf("state_data_clear: %s: %w", state, err)
+			}
 		}
 	}
 
 	if err := e.userRepository.SetUserState(userID, state); err != nil {
+		// Roll back a payload stored for a state the user never entered.
+		if raw != nil {
+			if derr := repo.DeleteUserStateData(userID, state); derr != nil {
+				e.onErr(ctx.Context(), ctx.client, ctx.Update,
+					fmt.Errorf("state_data_rollback: %s: %w", state, derr))
+			}
+		}
+
 		return fmt.Errorf("error_setting_user_state: %d, %w", userID, err)
 	}
-
-	previousState := ctx.State
 
 	ctx.State = state
 	ctx.IsSwitched = true
@@ -1021,7 +1043,7 @@ func (e *Engine) switchState(ctx *Ctx, state string, data any) error {
 	ctx.condResults = nil
 	ctx.switchDepth++
 
-	if repo != nil && previousState != "" && previousState != state {
+	if repo != nil && crossState {
 		if err := repo.DeleteUserStateData(userID, previousState); err != nil {
 			// Payload hygiene, not transition correctness: report, don't fail.
 			e.onErr(ctx.Context(), ctx.client, ctx.Update,

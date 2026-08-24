@@ -269,6 +269,18 @@ menu.Use(telejoon.DispatchOnly(rateLimiter)) // skipped on switch-render passes
 Route callbacks are answered automatically when the handler didn't answer
 itself — the client spinner never runs until timeout.
 
+Security note: `callback_data` is client-controlled. A crafted callback can
+invoke any route or internal state/menu transition without the button ever
+being rendered — `When`/`If` visibility is NOT an authorization check. Gate
+privileged states and routes with middleware (which runs on every entry),
+and never put an auth gate inside `DispatchOnly` (skipped on switch-render
+passes by design).
+
+Two render-path contracts worth knowing: `ButtonsFunc` runs once per render
+(and a fall-through re-render renders twice per update), so keep it free of
+side effects; and a state that renders no visible buttons sends
+`ReplyKeyboardRemove`, removing whatever keyboard a previous state left.
+
 ### Routes and codecs
 
 ```go

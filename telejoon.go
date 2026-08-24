@@ -2,8 +2,10 @@ package telejoon
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sync"
+	"time"
 
 	tgbotapi "github.com/aliforever/go-telegram-bot-api/v2"
 )
@@ -19,6 +21,24 @@ import (
 // a button or sending two quick messages can never race their own state
 // transitions or duplicate side effects.
 func Start(ctx context.Context, client *tgbotapi.Bot, processor Processor) error {
+	return start(ctx, client, processor, 0)
+}
+
+// StartWithShutdownTimeout is Start, but graceful shutdown waits at most
+// timeout for in-flight and queued updates to drain before returning.
+// Processing goroutines are not killed; a handler outliving the timeout may
+// still finish its sends in the background.
+func StartWithShutdownTimeout(
+	ctx context.Context,
+	client *tgbotapi.Bot,
+	processor Processor,
+	timeout time.Duration,
+) error {
+
+	return start(ctx, client, processor, timeout)
+}
+
+func start(ctx context.Context, client *tgbotapi.Bot, processor Processor, shutdownTimeout time.Duration) error {
 	var wg sync.WaitGroup
 
 	serializer := &chatSerializer{tails: map[int64]chan struct{}{}}
@@ -69,9 +89,25 @@ func Start(ctx context.Context, client *tgbotapi.Bot, processor Processor) error
 		}
 	}
 
-	wg.Wait()
+	done := make(chan struct{})
 
-	return ctx.Err()
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	if shutdownTimeout <= 0 {
+		<-done
+
+		return ctx.Err()
+	}
+
+	select {
+	case <-done:
+		return ctx.Err()
+	case <-time.After(shutdownTimeout):
+		return fmt.Errorf("telejoon: shutdown timed out after %s with updates still in flight", shutdownTimeout)
+	}
 }
 
 // updateChatKey returns the serialization key of an update: its chat ID.

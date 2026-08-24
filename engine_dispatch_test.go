@@ -235,6 +235,7 @@ func TestDispatchOnlySkipsSwitchRenderPass(t *testing.T) {
 
 type purchaseData struct {
 	ProductID int64
+	Qty       int
 }
 
 func TestStatePayloadLifecycle(t *testing.T) {
@@ -510,6 +511,9 @@ func TestMsgPWithTypedParams(t *testing.T) {
 }
 
 func TestValidateChecksDeclaredMessageKeys(t *testing.T) {
+	resetMsgRegistryForTest()
+	t.Cleanup(resetMsgRegistryForTest)
+
 	languages, err := NewLanguageBuilder(language.English).
 		AddTOML("testdata/locale.en.toml", "testdata/locale.fa.toml").
 		Build()
@@ -527,18 +531,11 @@ func TestValidateChecksDeclaredMessageKeys(t *testing.T) {
 		t.Fatalf("Validate with an existing key: %v", err)
 	}
 
-	// A key no locale defines must be reported. Check validateMsgs directly:
-	// the registry is global, and a poisoned key must not break the other
-	// tests' Validate runs.
-	missing := NewMsg("No.Such.Key")
+	// A key no locale defines must fail Validate.
+	NewMsg("No.Such.Key")
 
-	if missing.Key() != "No.Such.Key" {
-		t.Fatalf("Key() = %q", missing.Key())
-	}
-
-	reported := languages.validateMsgs()
-	if len(reported) != 1 || reported[0] != "No.Such.Key" {
-		t.Fatalf("validateMsgs = %v, want [No.Such.Key]", reported)
+	if err := engine.Validate(); err == nil || !strings.Contains(err.Error(), "No.Such.Key") {
+		t.Fatalf("Validate with a missing key = %v, want messages_not_translated", err)
 	}
 }
 

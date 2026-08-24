@@ -57,6 +57,10 @@ func Once(middleware Handler) Handler {
 // the destination of a state switch (Ctx.IsSwitched). Use it for middleware
 // whose work only matters when the user actually interacts with the menu —
 // rate limiting, typing indicators, analytics.
+//
+// Do NOT use it for authorization: a switch into the state (including via a
+// crafted callback) skips the wrapper on the render pass. Auth gates belong
+// in a plain menu middleware — it runs on every entry.
 func DispatchOnly(middleware Handler) Handler {
 	return func(ctx *Ctx) Action {
 		if ctx.IsSwitched {
